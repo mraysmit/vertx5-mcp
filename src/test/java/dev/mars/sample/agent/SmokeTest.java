@@ -23,7 +23,9 @@ public class SmokeTest {
 
   /** Deploy MainVerticle with a random HTTP port to avoid bind conflicts in parallel tests. */
   private DeploymentOptions testDeploymentOptions() {
-    return new DeploymentOptions().setConfig(new JsonObject().put("http.port", 0));
+    return new DeploymentOptions().setConfig(new JsonObject()
+        .put("http.port", 0)
+        .put("mcp.port", 0));
   }
 
   @Test

@@ -4,6 +4,8 @@ import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
 
+import java.util.logging.Logger;
+
 /**
  * Placeholder {@link LlmClient} implementation for calling a real LLM
  * (e.g.&nbsp;OpenAI, Azure OpenAI, Anthropic, or any compatible API).
@@ -51,6 +53,8 @@ import io.vertx.core.json.JsonObject;
  */
 public class OpenAiLlmClient implements LlmClient {
 
+  private static final Logger LOG = Logger.getLogger(OpenAiLlmClient.class.getName());
+
   private final Vertx vertx;
   private final String endpoint;
   private final String apiKey;
@@ -89,6 +93,10 @@ public class OpenAiLlmClient implements LlmClient {
    */
   @Override
   public Future<JsonObject> decideNext(JsonObject event, JsonObject state) {
+    LOG.info("OpenAiLlmClient.decideNext called — endpoint=" + endpoint + " model=" + model);
+    LOG.fine("Event: " + event.encode());
+    LOG.fine("State: " + state.encode());
+
     // ---------------------------------------------------------------
     // TODO: Replace this stub with a real HTTP call to the LLM API.
     //
@@ -110,6 +118,7 @@ public class OpenAiLlmClient implements LlmClient {
     //     .map(response -> parseCommand(response.bodyAsJsonObject()));
     //
     // ---------------------------------------------------------------
+    LOG.severe("OpenAiLlmClient is a placeholder — real LLM call not implemented");
     return Future.failedFuture(
       "OpenAiLlmClient is a placeholder — implement the HTTP call to " + endpoint);
   }

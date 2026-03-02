@@ -48,15 +48,22 @@ public class DeterministicFailureProcessorVerticle extends AbstractVerticle {
     vertx.eventBus().consumer(inboundAddress, msg -> {
       JsonObject event = (JsonObject) msg.body();
       String reason = event.getString("reason", "");
+      String tradeId = event.getString("tradeId", "<unknown>");
+
+      LOG.info("Received failure event: tradeId=" + tradeId + " reason='" + reason + "'");
 
       FailureHandler handler = handlers.get(reason);
       if (handler != null) {
         LOG.info("Deterministic path for reason='" + reason + "'");
         handler.handle(event)
-          .map(resultEvent -> new JsonObject()
-            .put("status", "ok")
-            .put("path", "deterministic")
-            .put("resultEvent", resultEvent))
+          .map(resultEvent -> {
+            LOG.info("Deterministic handling succeeded for trade=" + tradeId
+                + " reason='" + reason + "' resultType=" + resultEvent.getString("type"));
+            return new JsonObject()
+              .put("status", "ok")
+              .put("path", "deterministic")
+              .put("resultEvent", resultEvent);
+          })
           .onSuccess(msg::reply)
           .onFailure(err -> {
             LOG.log(Level.SEVERE, "Deterministic handling failed", err);
@@ -66,7 +73,10 @@ public class DeterministicFailureProcessorVerticle extends AbstractVerticle {
         LOG.info("Routing to agent for reason='" + reason + "'");
         DeliveryOptions opts = new DeliveryOptions().setSendTimeout(agentTimeout);
         vertx.eventBus().request(agentAddress, event, opts)
-          .onSuccess(reply -> msg.reply(reply.body()))
+          .onSuccess(reply -> {
+            LOG.info("Agent returned result for trade=" + tradeId + " reason='" + reason + "'");
+            msg.reply(reply.body());
+          })
           .onFailure(err -> {
             LOG.log(Level.SEVERE, "Agent dispatch failed", err);
             msg.fail(500, err.getMessage());

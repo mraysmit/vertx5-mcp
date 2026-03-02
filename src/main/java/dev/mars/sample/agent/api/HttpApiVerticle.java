@@ -93,6 +93,12 @@ public class HttpApiVerticle extends AbstractVerticle {
   public void start(Promise<Void> startPromise) {
     long timeoutMs = config().getLong("request.timeout.ms", DEFAULT_REQUEST_TIMEOUT_MS);
 
+    LOG.info("HttpApiVerticle starting: route=" + routePath
+        + " target=" + targetAddress
+        + " timeout=" + timeoutMs + "ms"
+        + " allowedFields=" + allowedFields
+        + " requiredFields=" + requiredFields);
+
     Router router = Router.router(vertx);
     router.route().handler(BodyHandler.create());
 
@@ -103,17 +109,21 @@ public class HttpApiVerticle extends AbstractVerticle {
     router.post(routePath).handler(ctx -> {
       JsonObject event = ctx.body().asJsonObject();
       if (event == null) {
+        LOG.warning("Rejected request on " + routePath + ": null JSON body");
         ctx.response().setStatusCode(400)
           .putHeader("content-type", "application/json")
           .end(new JsonObject().put("error", "Expected JSON body").encode());
         return;
       }
 
+      LOG.info("Received POST " + routePath + ": " + event.encode());
+
       // Check all required fields are present
       String missing = requiredFields.stream()
         .filter(f -> event.getString(f) == null)
         .collect(Collectors.joining(", "));
       if (!missing.isEmpty()) {
+        LOG.warning("Rejected request on " + routePath + ": missing fields=[" + missing + "]");
         ctx.response().setStatusCode(400)
           .putHeader("content-type", "application/json")
           .end(new JsonObject()
@@ -129,12 +139,16 @@ public class HttpApiVerticle extends AbstractVerticle {
         }
       }
 
+      LOG.fine("Dispatching sanitised payload to " + targetAddress + ": " + sanitized.encode());
+
       DeliveryOptions opts = new DeliveryOptions().setSendTimeout(timeoutMs);
       vertx.eventBus().request(targetAddress, sanitized, opts)
-        .onSuccess(reply -> ctx.response()
-          .putHeader("content-type", "application/json")
-          .end(((JsonObject) reply.body()).encodePrettily()))
-        .onFailure(err -> {
+        .onSuccess(reply -> {
+          LOG.info("Request on " + routePath + " succeeded — returning 200");
+          ctx.response()
+            .putHeader("content-type", "application/json")
+            .end(((JsonObject) reply.body()).encodePrettily());
+        }).onFailure(err -> {
           LOG.warning("Request failed on " + routePath + ": " + err.getMessage());
           ctx.response().setStatusCode(500)
             .putHeader("content-type", "application/json")

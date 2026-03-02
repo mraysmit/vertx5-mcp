@@ -5,6 +5,8 @@ import dev.mars.sample.agent.tool.RaiseTicketTool;
 import dev.mars.sample.agent.tool.Tool;
 import io.vertx.core.Vertx;
 
+import java.util.logging.Logger;
+
 /**
  * Factory that resolves tool type aliases from YAML configuration into
  * {@link Tool} instances.
@@ -27,6 +29,8 @@ import io.vertx.core.Vertx;
  */
 public final class ToolFactory {
 
+  private static final Logger LOG = Logger.getLogger(ToolFactory.class.getName());
+
   private ToolFactory() {}
 
   /**
@@ -39,11 +43,17 @@ public final class ToolFactory {
    * @throws IllegalArgumentException if the type is unknown
    */
   public static Tool create(String type, Vertx vertx, String eventsAddress) {
-    return switch (type) {
+    LOG.info("Creating tool: type=" + type);
+    Tool tool = switch (type) {
       case "publish-event" -> new PublishEventTool(vertx, eventsAddress);
       case "raise-ticket"  -> new RaiseTicketTool(vertx, eventsAddress);
 
-      default -> throw new IllegalArgumentException("Unknown tool type: " + type);
+      default -> {
+        LOG.severe("Unknown tool type: " + type);
+        throw new IllegalArgumentException("Unknown tool type: " + type);
+      }
     };
+    LOG.info("Created tool: name=" + tool.name() + " type=" + type);
+    return tool;
   }
 }

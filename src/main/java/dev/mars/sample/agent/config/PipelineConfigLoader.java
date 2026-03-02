@@ -53,14 +53,21 @@ public final class PipelineConfigLoader {
         .getResourceAsStream(resource)) {
 
       if (is == null) {
+        LOG.severe("Pipeline config not found on classpath: " + resource);
         throw new IllegalStateException(
             "Pipeline config not found on classpath: " + resource);
       }
 
       ObjectMapper mapper = new ObjectMapper(new YAMLFactory());
-      return mapper.readValue(is, PipelineConfig.class);
+      PipelineConfig config = mapper.readValue(is, PipelineConfig.class);
+      LOG.info("Pipeline config loaded: handlers=" + config.handlers().size()
+          + " tools=" + config.tools().size()
+          + " llm=" + config.llm().type()
+          + " schema.caseIdField=" + config.schema().caseIdField());
+      return config;
 
     } catch (IOException e) {
+      LOG.severe("Failed to parse pipeline config: " + resource + " — " + e.getMessage());
       throw new IllegalStateException("Failed to parse pipeline config: " + resource, e);
     }
   }

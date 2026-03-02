@@ -6,6 +6,7 @@ import dev.mars.sample.agent.llm.OpenAiLlmClient;
 import io.vertx.core.Vertx;
 
 import java.util.Map;
+import java.util.logging.Logger;
 
 /**
  * Factory that resolves LLM client type aliases from YAML configuration
@@ -32,6 +33,8 @@ import java.util.Map;
  */
 public final class LlmClientFactory {
 
+  private static final Logger LOG = Logger.getLogger(LlmClientFactory.class.getName());
+
   private LlmClientFactory() {}
 
   /**
@@ -45,17 +48,25 @@ public final class LlmClientFactory {
    *         params are missing
    */
   public static LlmClient create(String type, Map<String, String> params, Vertx vertx) {
+    LOG.info("Creating LLM client: type=" + type);
     return switch (type) {
-      case "stub" -> new TradeFailureRuleLoader().load().toClient();
+      case "stub" -> {
+        LOG.info("Stub LLM client created with trade-failure rules");
+        yield new TradeFailureRuleLoader().load().toClient();
+      }
 
       case "openai" -> {
         String endpoint = requireParam(params, "endpoint", type);
         String apiKey   = resolveEnvVar(requireParam(params, "apiKey", type));
         String model    = requireParam(params, "model", type);
+        LOG.info("OpenAI LLM client created: endpoint=" + endpoint + " model=" + model);
         yield new OpenAiLlmClient(vertx, endpoint, apiKey, model);
       }
 
-      default -> throw new IllegalArgumentException("Unknown LLM type: " + type);
+      default -> {
+        LOG.severe("Unknown LLM type: " + type);
+        throw new IllegalArgumentException("Unknown LLM type: " + type);
+      }
     };
   }
 
@@ -75,8 +86,10 @@ public final class LlmClientFactory {
   private static String resolveEnvVar(String value) {
     if (value.startsWith("${") && value.endsWith("}")) {
       String envName = value.substring(2, value.length() - 1);
+      LOG.fine("Resolving environment variable: " + envName);
       String envValue = System.getenv(envName);
       if (envValue == null || envValue.isBlank()) {
+        LOG.severe("Environment variable '" + envName + "' is not set");
         throw new IllegalStateException(
             "Environment variable '" + envName + "' is not set");
       }

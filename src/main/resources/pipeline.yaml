@@ -67,3 +67,18 @@ tools:
 #             params: { endpoint: "...", apiKey: "${OPENAI_API_KEY}", model: "gpt-4" }
 llm:
   type: "stub"
+# ── MCP server ───────────────────────────────────────────────────────
+# When enabled, exposes the agent's tools via the Model Context Protocol
+# (HTTP + SSE transport) so external MCP clients (e.g. Claude Desktop,
+# IDEs) can discover and invoke them.
+#
+# Endpoints (relative to basePath):
+#   GET  /sse             — SSE connection for JSON-RPC responses
+#   POST /message         — JSON-RPC 2.0 request endpoint
+#
+# Supported JSON-RPC methods:
+#   initialize, ping, tools/list, tools/call
+mcp:
+  enabled: true
+  port: 3001
+  basePath: ""

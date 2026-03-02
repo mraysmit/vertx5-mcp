@@ -33,6 +33,7 @@ public class EventSinkVerticle extends AbstractVerticle {
 
   @Override
   public void start(Promise<Void> startPromise) {
+    LOG.info("EventSinkVerticle subscribing to: " + eventsAddress);
     vertx.eventBus().consumer(eventsAddress, msg -> {
       JsonObject event = (JsonObject) msg.body();
       LOG.info("[EVENTS_OUT] " + event.encode());

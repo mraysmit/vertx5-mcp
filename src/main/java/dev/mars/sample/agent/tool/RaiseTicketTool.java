@@ -6,6 +6,7 @@ import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
 
 import java.util.UUID;
+import java.util.logging.Logger;
 
 /**
  * Agent tool that creates a support ticket for a failure that requires
@@ -41,6 +42,8 @@ import java.util.UUID;
  * </pre>
  */
 public class RaiseTicketTool implements Tool {
+
+  private static final Logger LOG = Logger.getLogger(RaiseTicketTool.class.getName());
 
   private final Vertx vertx;
   private final String eventsAddress;
@@ -88,23 +91,29 @@ public class RaiseTicketTool implements Tool {
   @Override
   public Future<JsonObject> invoke(JsonObject args, AgentContext ctx) {
     String ticketId = "TICKET-" + UUID.randomUUID();
+    String tradeId = args.getString("tradeId");
+    String category = args.getString("category");
+
+    LOG.info("Raising ticket: ticketId=" + ticketId + " tradeId=" + tradeId
+        + " category=" + category + " caseId=" + ctx.caseId());
 
     JsonObject result = new JsonObject()
       .put("status", "created")
       .put("ticketId", ticketId)
-      .put("tradeId", args.getString("tradeId"))
-      .put("category", args.getString("category"))
+      .put("tradeId", tradeId)
+      .put("category", category)
       .put("summary", args.getString("summary"));
 
     JsonObject event = new JsonObject()
       .put("type", "TicketCreated")
       .put("ticketId", ticketId)
-      .put("tradeId", args.getString("tradeId"))
-      .put("category", args.getString("category"))
+      .put("tradeId", tradeId)
+      .put("category", category)
       .put("correlationId", ctx.correlationId())
       .put("caseId", ctx.caseId());
     vertx.eventBus().publish(eventsAddress, event);
 
+    LOG.info("Ticket created and TicketCreated event published: ticketId=" + ticketId);
     return Future.succeededFuture(result);
   }
 }

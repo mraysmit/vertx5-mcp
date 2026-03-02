@@ -5,6 +5,8 @@ import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
 
+import java.util.logging.Logger;
+
 /**
  * {@link FailureHandler} that repairs a trade by looking up and enriching a
  * missing identifier.
@@ -31,6 +33,8 @@ import io.vertx.core.json.JsonObject;
  */
 public class LookupEnrichHandler implements FailureHandler {
 
+  private static final Logger LOG = Logger.getLogger(LookupEnrichHandler.class.getName());
+
   private final Vertx vertx;
   private final String eventsAddress;
   private final String identifierName;
@@ -50,6 +54,8 @@ public class LookupEnrichHandler implements FailureHandler {
   public Future<JsonObject> handle(JsonObject event) {
     String tradeId = event.getString("tradeId");
 
+    LOG.info("Lookup+enrich " + identifierName + " for trade=" + tradeId);
+
     JsonObject repaired = new JsonObject()
       .put("type", "TradeRepaired")
       .put("tradeId", tradeId)
@@ -58,6 +64,7 @@ public class LookupEnrichHandler implements FailureHandler {
 
     vertx.eventBus().publish(eventsAddress, repaired);
 
+    LOG.info("Published TradeRepaired event for trade=" + tradeId + " (" + identifierName + ")");
     return Future.succeededFuture(repaired);
   }
 }

@@ -53,6 +53,8 @@ import java.util.List;
  * @param handlers  deterministic failure handlers
  * @param tools     agent tools
  * @param llm       LLM client configuration
+ * @param mcp       MCP server configuration (nullable; {@code null} means
+ *                  disabled)
  *
  * @see PipelineConfigLoader
  */
@@ -63,5 +65,6 @@ public record PipelineConfig(
     AgentConfig agent,
     List<HandlerConfig> handlers,
     List<ToolConfig> tools,
-    LlmConfig llm
+    LlmConfig llm,
+    McpConfig mcp
 ) {}

@@ -7,6 +7,7 @@ import dev.mars.sample.agent.llm.StubRuleSet;
 import io.vertx.core.json.JsonObject;
 
 import java.util.List;
+import java.util.logging.Logger;
 
 /**
  * Rule loader for the <b>trade-failure</b> use case.
@@ -33,6 +34,8 @@ import java.util.List;
  */
 public class TradeFailureRuleLoader implements StubRuleLoader {
 
+  private static final Logger LOG = Logger.getLogger(TradeFailureRuleLoader.class.getName());
+
   @Override
   public StubRuleSet load() {
     List<StubRule> rules = List.of(
@@ -54,6 +57,7 @@ public class TradeFailureRuleLoader implements StubRuleLoader {
       .put("expected", "Escalation event published")
       .put("stop", true);
 
+    LOG.info("Loaded trade-failure stub rules: " + rules.size() + " rules + fallback");
     return new StubRuleSet(rules, fallback);
   }
 }

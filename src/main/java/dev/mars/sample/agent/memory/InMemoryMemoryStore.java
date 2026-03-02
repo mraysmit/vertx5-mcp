@@ -6,6 +6,7 @@ import io.vertx.core.json.JsonObject;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.logging.Logger;
 
 /**
  * Non-persistent {@link MemoryStore} backed by {@link ConcurrentHashMap}s.
@@ -24,15 +25,21 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public class InMemoryMemoryStore implements MemoryStore {
 
+  private static final Logger LOG = Logger.getLogger(InMemoryMemoryStore.class.getName());
+
   private final Map<String, JsonObject> stateByCase = new ConcurrentHashMap<>();
   private final Map<String, JsonArray> logByCase = new ConcurrentHashMap<>();
 
   @Override
   public Future<JsonObject> load(String caseId) {
-    JsonObject state = stateByCase.computeIfAbsent(caseId, k -> new JsonObject()
-      .put("caseId", caseId)
-      .put("createdAt", System.currentTimeMillis())
-      .put("step", 0));
+    JsonObject state = stateByCase.computeIfAbsent(caseId, k -> {
+      LOG.info("Memory: new case state created for caseId=" + caseId);
+      return new JsonObject()
+        .put("caseId", caseId)
+        .put("createdAt", System.currentTimeMillis())
+        .put("step", 0);
+    });
+    LOG.fine("Memory: loaded state for caseId=" + caseId + " step=" + state.getInteger("step", 0));
     return Future.succeededFuture(state.copy());
   }
 
@@ -49,6 +56,7 @@ public class InMemoryMemoryStore implements MemoryStore {
       s.put("step", step + 1);
       s.put("last", entry);
       s.put("updatedAt", System.currentTimeMillis());
+      LOG.info("Memory: appended entry for caseId=" + caseId + " newStep=" + (step + 1));
       return s;
     });
     return Future.succeededFuture();

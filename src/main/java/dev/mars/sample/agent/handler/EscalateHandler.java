@@ -5,6 +5,8 @@ import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
 
+import java.util.logging.Logger;
+
 /**
  * {@link FailureHandler} that escalates a trade failure which is recognised but
  * cannot be automatically repaired — for example, an invalid counterparty.
@@ -27,6 +29,8 @@ import io.vertx.core.json.JsonObject;
  */
 public class EscalateHandler implements FailureHandler {
 
+  private static final Logger LOG = Logger.getLogger(EscalateHandler.class.getName());
+
   private final Vertx vertx;
   private final String eventsAddress;
 
@@ -44,6 +48,8 @@ public class EscalateHandler implements FailureHandler {
     String tradeId = event.getString("tradeId");
     String reason = event.getString("reason");
 
+    LOG.info("Escalating trade=" + tradeId + " reason='" + reason + "'");
+
     JsonObject escalated = new JsonObject()
       .put("type", "TradeEscalated")
       .put("tradeId", tradeId)
@@ -52,6 +58,7 @@ public class EscalateHandler implements FailureHandler {
 
     vertx.eventBus().publish(eventsAddress, escalated);
 
+    LOG.info("Published TradeEscalated event for trade=" + tradeId);
     return Future.succeededFuture(escalated);
   }
 }

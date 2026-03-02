@@ -103,6 +103,9 @@ public class AgentRunnerVerticle extends AbstractVerticle {
   public void start(Promise<Void> startPromise) {
     maxSteps = config().getInteger("agent.max.steps", DEFAULT_MAX_STEPS);
 
+    LOG.info("AgentRunner starting: address=" + listenAddress
+        + " maxSteps=" + maxSteps + " tools=" + tools.keySet());
+
     vertx.eventBus().consumer(listenAddress, msg -> {
       JsonObject event = (JsonObject) msg.body();
       String caseId = event.getString(caseIdField);
@@ -137,7 +140,13 @@ public class AgentRunnerVerticle extends AbstractVerticle {
     // Step 1: Ask the LLM what to do — the LLM decides which tool to call
     return llm.decideNext(event, ctx.state())
       // Step 2: Execute the tool the LLM selected (validated against allow-list)
-      .compose(cmd -> executeCommand(cmd, ctx))
+      .compose(cmd -> {
+        LOG.info("LLM decided: intent=" + cmd.getString("intent")
+            + " tool=" + cmd.getString("tool")
+            + " stop=" + cmd.getBoolean("stop", true)
+            + " for case=" + ctx.caseId());
+        return executeCommand(cmd, ctx);
+      })
       // Step 3: Record the step in memory for audit and future LLM context
       .compose(outcome -> memory.append(ctx.caseId(), new JsonObject()
           .put("step", step)
@@ -148,8 +157,10 @@ public class AgentRunnerVerticle extends AbstractVerticle {
       // Step 4: Loop if the LLM said stop=false, otherwise return the result
       .compose(outcome -> {
         if (!outcome.getBoolean("stop", true)) {
+          LOG.info("Agent continuing to step " + (step + 1) + " for case=" + ctx.caseId());
           return runLoop(event, ctx, step + 1);
         }
+        LOG.info("Agent completed for case=" + ctx.caseId() + " after " + (step + 1) + " step(s)");
         return Future.succeededFuture(new JsonObject()
           .put("status", "ok")
           .put("path", "agent")
@@ -171,17 +182,25 @@ public class AgentRunnerVerticle extends AbstractVerticle {
     JsonObject args = cmd.getJsonObject("args", new JsonObject());
 
     if (!"CALL_TOOL".equals(intent)) {
+      LOG.warning("Unsupported intent='" + intent + "' for case=" + ctx.caseId());
       return Future.failedFuture("Unsupported intent: " + intent);
     }
 
     Tool tool = tools.get(toolName);
     if (tool == null) {
+      LOG.warning("Tool not allowlisted: " + toolName
+          + " (available: " + tools.keySet() + ") for case=" + ctx.caseId());
       return Future.failedFuture("Tool not allowlisted: " + toolName);
     }
 
-    return tool.invoke(args, ctx).map(result -> new JsonObject()
-      .put("stop", cmd.getBoolean("stop", true))
-      .put("command", cmd)
-      .put("toolResult", result));
+    LOG.info("Invoking tool=" + toolName + " for case=" + ctx.caseId() + " args=" + args.encode());
+    return tool.invoke(args, ctx).map(result -> {
+      LOG.info("Tool " + toolName + " completed for case=" + ctx.caseId()
+          + " result=" + result.encode());
+      return new JsonObject()
+        .put("stop", cmd.getBoolean("stop", true))
+        .put("command", cmd)
+        .put("toolResult", result);
+    });
   }
 }

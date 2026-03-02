@@ -6,6 +6,7 @@ import io.vertx.core.json.JsonObject;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;
+import java.util.logging.Logger;
 
 /**
  * A rule-based {@link LlmClient} stub for local development and testing.
@@ -33,6 +34,8 @@ import java.util.function.Function;
  * @see StubRule
  */
 public class StubLlmClient implements LlmClient {
+
+  private static final Logger LOG = Logger.getLogger(StubLlmClient.class.getName());
 
   private final List<StubRule> rules;
   private final StubRule fallback;
@@ -80,12 +83,18 @@ public class StubLlmClient implements LlmClient {
 
   @Override
   public Future<JsonObject> decideNext(JsonObject event, JsonObject state) {
+    String reason = event.getString("reason", "<none>");
+    LOG.info("StubLlmClient evaluating " + rules.size() + " rules for reason='" + reason + "'");
+
     for (StubRule rule : rules) {
       JsonObject cmd = rule.tryMatch(event);
       if (cmd != null) {
+        LOG.info("Stub rule matched: tool=" + cmd.getString("tool") + " stop=" + cmd.getBoolean("stop", true));
         return Future.succeededFuture(cmd);
       }
     }
+
+    LOG.info("No stub rule matched for reason='" + reason + "' — using fallback");
     return Future.succeededFuture(fallback.tryMatch(event));
   }
 }

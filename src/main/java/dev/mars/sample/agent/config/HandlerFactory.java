@@ -6,6 +6,7 @@ import dev.mars.sample.agent.processor.FailureHandler;
 import io.vertx.core.Vertx;
 
 import java.util.Map;
+import java.util.logging.Logger;
 
 /**
  * Factory that resolves handler type aliases from YAML configuration into
@@ -31,6 +32,8 @@ import java.util.Map;
  */
 public final class HandlerFactory {
 
+  private static final Logger LOG = Logger.getLogger(HandlerFactory.class.getName());
+
   private HandlerFactory() {}
 
   /**
@@ -46,18 +49,28 @@ public final class HandlerFactory {
    */
   public static FailureHandler create(String type, Map<String, String> params,
                                       Vertx vertx, String eventsAddress) {
-    return switch (type) {
+    LOG.info("Creating handler: type=" + type + " params=" + params);
+    FailureHandler handler = switch (type) {
       case "lookup-enrich" -> {
         String identifier = params.get("identifier");
         if (identifier == null || identifier.isBlank()) {
+          LOG.severe("Handler type 'lookup-enrich' missing required param 'identifier'");
           throw new IllegalArgumentException(
               "Handler type 'lookup-enrich' requires param 'identifier'");
         }
+        LOG.info("Created LookupEnrichHandler for identifier='" + identifier + "'");
         yield new LookupEnrichHandler(vertx, eventsAddress, identifier);
       }
-      case "escalate" -> new EscalateHandler(vertx, eventsAddress);
+      case "escalate" -> {
+        LOG.info("Created EscalateHandler");
+        yield new EscalateHandler(vertx, eventsAddress);
+      }
 
-      default -> throw new IllegalArgumentException("Unknown handler type: " + type);
+      default -> {
+        LOG.severe("Unknown handler type: " + type);
+        throw new IllegalArgumentException("Unknown handler type: " + type);
+      }
     };
+    return handler;
   }
 }

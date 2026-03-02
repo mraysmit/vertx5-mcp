@@ -5,6 +5,8 @@ import io.vertx.core.Future;
 import io.vertx.core.Vertx;
 import io.vertx.core.json.JsonObject;
 
+import java.util.logging.Logger;
+
 /**
  * Agent tool that publishes an arbitrary domain event to the
  * injected events address.
@@ -27,6 +29,8 @@ import io.vertx.core.json.JsonObject;
  * </pre>
  */
 public class PublishEventTool implements Tool {
+
+  private static final Logger LOG = Logger.getLogger(PublishEventTool.class.getName());
 
   private final Vertx vertx;
   private final String eventsAddress;
@@ -69,11 +73,16 @@ public class PublishEventTool implements Tool {
 
   @Override
   public Future<JsonObject> invoke(JsonObject args, AgentContext ctx) {
+    LOG.info("Publishing event: type=" + args.getString("type")
+        + " caseId=" + ctx.caseId() + " correlationId=" + ctx.correlationId());
+
     JsonObject event = args.copy()
       .put("correlationId", ctx.correlationId())
       .put("caseId", ctx.caseId());
 
     vertx.eventBus().publish(eventsAddress, event);
+
+    LOG.info("Event published to " + eventsAddress + ": type=" + event.getString("type"));
     return Future.succeededFuture(new JsonObject()
       .put("status", "published")
       .put("event", event));
