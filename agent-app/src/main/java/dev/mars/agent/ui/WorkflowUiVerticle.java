@@ -97,6 +97,23 @@ public class WorkflowUiVerticle extends AbstractVerticle {
       });
     });
 
+    // ── Trade XML endpoint ────────────────────────────────────────
+    router.get("/workflow/api/trade/:tradeId").handler(ctx -> {
+      String tradeId = ctx.pathParam("tradeId");
+      String xmlPath = "trades/" + tradeId + ".xml";
+      vertx.fileSystem().readFile(xmlPath)
+          .onSuccess(buf -> ctx.response()
+              .putHeader("content-type", "application/xml;charset=UTF-8")
+              .putHeader("access-control-allow-origin", "*")
+              .end(buf))
+          .onFailure(err -> ctx.response()
+              .setStatusCode(404)
+              .putHeader("content-type", "application/json")
+              .end(new JsonObject()
+                  .put("error", "Trade XML not found: " + tradeId)
+                  .encode()));
+    });
+
     // ── Run workflow endpoint ─────────────────────────────────────
     router.post("/workflow/api/run").handler(ctx -> {
       JsonObject payload;
@@ -156,6 +173,20 @@ public class WorkflowUiVerticle extends AbstractVerticle {
                 .putHeader("content-type", "text/html;charset=UTF-8")
                 .end(buf))
             .onFailure(err -> routingCtx.response().setStatusCode(500).end());
+      } else if (path.endsWith(".css")) {
+        String fileName = path.substring(path.lastIndexOf('/') + 1);
+        vertx.fileSystem().readFile("webroot/" + fileName)
+            .onSuccess(buf -> routingCtx.response()
+                .putHeader("content-type", "text/css;charset=UTF-8")
+                .end(buf))
+            .onFailure(err -> routingCtx.response().setStatusCode(404).end());
+      } else if (path.endsWith(".js")) {
+        String fileName = path.substring(path.lastIndexOf('/') + 1);
+        vertx.fileSystem().readFile("webroot/" + fileName)
+            .onSuccess(buf -> routingCtx.response()
+                .putHeader("content-type", "application/javascript;charset=UTF-8")
+                .end(buf))
+            .onFailure(err -> routingCtx.response().setStatusCode(404).end());
       } else {
         routingCtx.response().setStatusCode(404).end();
       }

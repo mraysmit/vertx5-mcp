@@ -28,6 +28,13 @@ schema:
     - tradeId
     - reason
     - altIds
+    - counterparty
+    - instrument
+    - notional
+    - currency
+    - settlementDate
+    - book
+    - venue
   requiredFields:
     - tradeId
     - reason
@@ -69,10 +76,19 @@ tools:
 # ── LLM client ──────────────────────────────────────────────────────────────
 # Supported types:
 #   stub    — rule-based stub for local dev (no network calls)
-#   openai  — placeholder for real LLM integration
-#             params: { endpoint: "...", apiKey: "${OPENAI_API_KEY}", model: "gpt-4" }
+#   openai  — calls a real LLM via OpenAI Chat Completions API
+#             with function-calling for structured tool invocation.
+#             Params: endpoint, apiKey (supports ${ENV_VAR} syntax), model
+#
+# To switch to a real LLM, comment out the stub section and uncomment
+# the openai section below:
 llm:
   type: "stub"
+#  type: "openai"
+#  params:
+#    endpoint: "https://api.openai.com/v1"
+#    apiKey: "${OPENAI_API_KEY}"
+#    model: "gpt-4o"
 # ── MCP server ───────────────────────────────────────────────────────
 # When enabled, exposes the agent's tools via the Model Context Protocol
 # (HTTP + SSE transport) so external MCP clients (e.g. Claude Desktop,

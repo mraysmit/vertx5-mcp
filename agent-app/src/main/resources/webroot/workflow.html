@@ -50,6 +50,18 @@
             <span class="scenario-label">⏰ Regulatory Deadline</span>
             <span class="scenario-desc">Agent → Lookup → Classify (SEC T+1) → Ticket → PagerDuty (4-step)</span>
           </button>
+          <button class="scenario-btn" onclick="loadScenario('sanctions')">
+            <span class="scenario-label">🛡️ Sanctions Screening</span>
+            <span class="scenario-desc">Agent → Lookup → Classify (false-positive analysis) → Ticket → Event → Notify (5-step)</span>
+          </button>
+          <button class="scenario-btn" onclick="loadScenario('cascade')">
+            <span class="scenario-label">🔗 Multi-Leg Cascade</span>
+            <span class="scenario-desc">Agent → Lookup → Classify (structural reasoning) → Ticket → Event → Notify (5-step)</span>
+          </button>
+          <button class="scenario-btn" onclick="loadScenario('credit-event')">
+            <span class="scenario-label">📉 Counterparty Credit Event</span>
+            <span class="scenario-desc">Agent → Lookup → Classify (portfolio/netting) → Ticket → Event → Notify (5-step)</span>
+          </button>
         </div>
       </div>
 
@@ -64,12 +76,43 @@
           <input type="text" id="reason" value="Missing ISIN" placeholder="e.g. Missing ISIN">
         </div>
         <div class="form-group" style="margin-top:8px;">
+          <label>Counterparty</label>
+          <input type="text" id="counterparty" value="" placeholder="e.g. Acme Corp">
+        </div>
+        <div class="form-group" style="margin-top:8px;">
+          <label>Instrument</label>
+          <input type="text" id="instrument" value="" placeholder="e.g. AAPL 5Y CDS">
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <div class="form-group" style="flex:1;">
+            <label>Notional</label>
+            <input type="text" id="notional" value="" placeholder="e.g. 5000000">
+          </div>
+          <div class="form-group" style="flex:0 0 80px;">
+            <label>Currency</label>
+            <input type="text" id="currency" value="" placeholder="USD">
+          </div>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:8px;">
+          <div class="form-group" style="flex:1;">
+            <label>Settlement Date</label>
+            <input type="text" id="settlementDate" value="" placeholder="2026-03-05">
+          </div>
+          <div class="form-group" style="flex:1;">
+            <label>Book / Venue</label>
+            <input type="text" id="book" value="" placeholder="e.g. NYC-FI">
+          </div>
+        </div>
+        <div class="form-group" style="margin-top:8px;">
           <label>Alt IDs (optional)</label>
           <input type="text" id="altIds" value="" placeholder="e.g. CUSIP-123">
         </div>
       </div>
 
-      <button class="run-btn" id="runBtn" onclick="runWorkflow()">▶ Run Workflow</button>
+      <div style="display:flex;gap:8px;">
+        <button class="run-btn" id="runBtn" onclick="runWorkflow()" style="flex:1;">▶ Run Workflow</button>
+        <button class="xml-btn" id="xmlBtn" onclick="viewTradeXml()">📄 XML</button>
+      </div>
       <button class="reset-btn" onclick="resetAll()">Reset</button>
 
       <div class="summary-bar" id="summaryBar" style="display:none;">
@@ -176,6 +219,16 @@
     </div>
   </div>
 
+  <!-- ─── Trade XML Overlay ─────────────────────────────────────── -->
+  <div class="response-overlay" id="xmlOverlay">
+    <div class="response-card" style="max-width:750px;">
+      <h3 id="xmlTitle">Trade XML</h3>
+      <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Source document from upstream trade capture / settlement system</div>
+      <pre id="xmlContent" style="max-height:60vh;overflow:auto;font-size:11px;line-height:1.5;"></pre>
+      <button class="close-btn" onclick="document.getElementById('xmlOverlay').classList.remove('visible')">Close</button>
+    </div>
+  </div>
+
   <script>
     // ── State ────────────────────────────────────────────────────────
     let running = false;
@@ -183,13 +236,26 @@
     let runCounter = 0;
 
     const scenarios = {
-      'missing-isin':    { tradeId: 'T-100', reason: 'Missing ISIN',                altIds: '' },
-      'invalid-cpty':    { tradeId: 'T-200', reason: 'Invalid Counterparty',        altIds: '' },
-      'lei-not-found':   { tradeId: 'T-300', reason: 'LEI not found',               altIds: '' },
-      'unknown':         { tradeId: 'T-400', reason: 'Suspicious pattern',          altIds: '' },
-      'amount-mismatch': { tradeId: 'T-500', reason: 'Settlement amount mismatch',  altIds: '' },
-      'duplicate':       { tradeId: 'T-600', reason: 'Possible duplicate trade',    altIds: '' },
-      'regulatory':      { tradeId: 'T-700', reason: 'Regulatory T+1 deadline at risk', altIds: '' },
+      'missing-isin':    { tradeId: 'T-100', reason: 'Missing ISIN',
+                           counterparty: 'Nomura Securities', instrument: 'Toyota Motor 3.5% 2028', notional: '10000000', currency: 'JPY', settlementDate: '2026-03-05', book: 'TKY-FI', altIds: '' },
+      'invalid-cpty':    { tradeId: 'T-200', reason: 'Invalid Counterparty',
+                           counterparty: 'UNKNOWN_ENTITY', instrument: 'US Treasury 10Y Note', notional: '25000000', currency: 'USD', settlementDate: '2026-03-04', book: 'NYC-GOV', altIds: '' },
+      'lei-not-found':   { tradeId: 'T-300', reason: 'LEI not found',
+                           counterparty: 'Silverlake Capital', instrument: 'Silverlake 5Y CDS', notional: '5000000', currency: 'USD', settlementDate: '2026-03-06', book: 'NYC-CR', altIds: '' },
+      'unknown':         { tradeId: 'T-400', reason: 'Suspicious pattern',
+                           counterparty: 'Deutsche Bank AG', instrument: 'EUR/USD FX Forward', notional: '15000000', currency: 'EUR', settlementDate: '2026-03-07', book: 'LDN-FX', altIds: '' },
+      'amount-mismatch': { tradeId: 'T-500', reason: 'Settlement amount mismatch',
+                           counterparty: 'BNP Paribas', instrument: 'Airbus SE 2.75% 2030', notional: '8000000', currency: 'EUR', settlementDate: '2026-03-04', book: 'PAR-FI', altIds: '' },
+      'duplicate':       { tradeId: 'T-600', reason: 'Possible duplicate trade',
+                           counterparty: 'Goldman Sachs', instrument: 'Apple Inc 3.25% 2029', notional: '12000000', currency: 'USD', settlementDate: '2026-03-05', book: 'NYC-IG', altIds: '' },
+      'regulatory':      { tradeId: 'T-700', reason: 'Regulatory T+1 deadline at risk',
+                           counterparty: 'Morgan Stanley', instrument: 'MSFT Equity Swap', notional: '20000000', currency: 'USD', settlementDate: '2026-03-04', book: 'NYC-EQ', altIds: '' },
+      'sanctions':       { tradeId: 'T-800', reason: 'OFAC sanctions screening flag on counterparty',
+                           counterparty: 'Meridian Trading FZE', instrument: 'Meridian 5Y CDS', notional: '5000000', currency: 'USD', settlementDate: '2026-03-04', book: 'LDN-EM', altIds: '' },
+      'cascade':         { tradeId: 'T-900', reason: 'Linked trade cascade failure on swap leg',
+                           counterparty: 'Global Bank AG', instrument: 'EUR IRS 10Y Pay Fixed', notional: '50000000', currency: 'EUR', settlementDate: '2026-03-05', book: 'FFT-RATES', altIds: '' },
+      'credit-event':    { tradeId: 'T-1000', reason: 'Counterparty credit downgrade detected',
+                           counterparty: 'Sterling & Hart Capital', instrument: 'Portfolio (4 positions)', notional: '19800000', currency: 'USD', settlementDate: '2026-03-04', book: 'LDN-CR', altIds: '' },
     };
 
     // ── Scenario loader ──────────────────────────────────────────────
@@ -198,10 +264,97 @@
       if (!s) return;
       document.getElementById('tradeId').value = s.tradeId;
       document.getElementById('reason').value = s.reason;
-      document.getElementById('altIds').value = s.altIds;
+      document.getElementById('counterparty').value = s.counterparty || '';
+      document.getElementById('instrument').value = s.instrument || '';
+      document.getElementById('notional').value = s.notional || '';
+      document.getElementById('currency').value = s.currency || '';
+      document.getElementById('settlementDate').value = s.settlementDate || '';
+      document.getElementById('book').value = s.book || '';
+      document.getElementById('altIds').value = s.altIds || '';
       // highlight the clicked button
       document.querySelectorAll('.scenario-btn').forEach(b => b.style.borderColor = '');
       event.currentTarget.style.borderColor = 'var(--accent)';
+    }
+
+    // ── View Trade XML ──────────────────────────────────────────────
+    async function viewTradeXml() {
+      const tradeId = document.getElementById('tradeId').value.trim();
+      if (!tradeId) { alert('Enter a Trade ID first'); return; }
+      try {
+        const res = await fetch('/workflow/api/trade/' + encodeURIComponent(tradeId));
+        if (!res.ok) {
+          alert('No trade XML found for ' + tradeId);
+          return;
+        }
+        const xml = await res.text();
+        document.getElementById('xmlTitle').textContent = 'Trade XML \u2014 ' + tradeId;
+        document.getElementById('xmlContent').innerHTML = highlightXml(xml);
+        document.getElementById('xmlOverlay').classList.add('visible');
+      } catch (e) {
+        alert('Error fetching trade XML: ' + e.message);
+      }
+    }
+
+    function highlightXml(xml) {
+      // tokenise then highlight — avoids regex passes clobbering each other
+      const esc = c => c.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+      const CLR_TAG  = '#58a6ff'; // cyan  — tag names
+      const CLR_ATTR = '#7ee787'; // green — attribute names
+      const CLR_VAL  = '#f0883e'; // orange — attribute values
+      const CLR_CMT  = '#8b949e'; // grey  — comments
+      const CLR_HDR  = '#8b949e'; // grey  — <?xml ...?>
+
+      let out = '';
+      let i = 0;
+      while (i < xml.length) {
+        // XML comment
+        if (xml.startsWith('<!--', i)) {
+          const end = xml.indexOf('-->', i);
+          const cmtEnd = end < 0 ? xml.length : end + 3;
+          out += '<span style="color:' + CLR_CMT + '">' + esc(xml.substring(i, cmtEnd)) + '</span>';
+          i = cmtEnd; continue;
+        }
+        // Processing instruction <?...?>
+        if (xml.startsWith('<?', i)) {
+          const end = xml.indexOf('?>', i);
+          const piEnd = end < 0 ? xml.length : end + 2;
+          out += '<span style="color:' + CLR_HDR + '">' + esc(xml.substring(i, piEnd)) + '</span>';
+          i = piEnd; continue;
+        }
+        // Tag (opening, closing, self-closing)
+        if (xml[i] === '<') {
+          const end = xml.indexOf('>', i);
+          if (end < 0) { out += esc(xml.substring(i)); break; }
+          const raw = xml.substring(i, end + 1);
+          // parse tag: name + attributes
+          const m = raw.match(/^<(\/?)([\w:\-]+)([\s\S]*?)(\/?)>$/);
+          if (m) {
+            const slash1 = m[1], tagName = m[2], attrStr = m[3], slash2 = m[4];
+            out += '&lt;' + esc(slash1)
+              + '<span style="color:' + CLR_TAG + '">' + esc(tagName) + '</span>';
+            // highlight attributes
+            if (attrStr) {
+              out += attrStr.replace(/([\w:\-]+)\s*=\s*"([^"]*)"/g, function(_, name, val) {
+                return ' <span style="color:' + CLR_ATTR + '">' + esc(name) + '</span>'
+                  + '=<span style="color:' + CLR_VAL + '">&quot;' + esc(val) + '&quot;</span>';
+              }).replace(/([\w:\-]+)\s*=\s*'([^']*)'/g, function(_, name, val) {
+                return ' <span style="color:' + CLR_ATTR + '">' + esc(name) + '</span>'
+                  + '=<span style="color:' + CLR_VAL + '">&#39;' + esc(val) + '&#39;</span>';
+              });
+            }
+            out += esc(slash2) + '&gt;';
+          } else {
+            out += esc(raw);
+          }
+          i = end + 1; continue;
+        }
+        // Text content
+        const next = xml.indexOf('<', i);
+        const textEnd = next < 0 ? xml.length : next;
+        out += esc(xml.substring(i, textEnd));
+        i = textEnd;
+      }
+      return out;
     }
 
     // ── Reset ────────────────────────────────────────────────────────
@@ -404,9 +557,21 @@
 
       const tradeId = document.getElementById('tradeId').value.trim() || 'T-100';
       const reason = document.getElementById('reason').value.trim() || 'Missing ISIN';
+      const counterparty = document.getElementById('counterparty').value.trim();
+      const instrument = document.getElementById('instrument').value.trim();
+      const notional = document.getElementById('notional').value.trim();
+      const currency = document.getElementById('currency').value.trim();
+      const settlementDate = document.getElementById('settlementDate').value.trim();
+      const book = document.getElementById('book').value.trim();
       const altIds = document.getElementById('altIds').value.trim();
 
       const payload = { tradeId, reason };
+      if (counterparty) payload.counterparty = counterparty;
+      if (instrument) payload.instrument = instrument;
+      if (notional) payload.notional = notional;
+      if (currency) payload.currency = currency;
+      if (settlementDate) payload.settlementDate = settlementDate;
+      if (book) payload.book = book;
       if (altIds) payload.altIds = altIds;
 
       // ── Step 1: HTTP send ──────────────────────────────────────

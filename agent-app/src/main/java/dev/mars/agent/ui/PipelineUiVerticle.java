@@ -60,6 +60,20 @@ public class PipelineUiVerticle extends AbstractVerticle {
               .putHeader("content-type", "text/html;charset=UTF-8")
               .end(buf))
           .onFailure(err -> ctx.response().setStatusCode(500).end());
+      } else if (path.endsWith(".css")) {
+        String fileName = path.substring(path.lastIndexOf('/') + 1);
+        vertx.fileSystem().readFile("webroot/" + fileName)
+          .onSuccess(buf -> ctx.response()
+              .putHeader("content-type", "text/css;charset=UTF-8")
+              .end(buf))
+          .onFailure(err -> ctx.response().setStatusCode(404).end());
+      } else if (path.endsWith(".js")) {
+        String fileName = path.substring(path.lastIndexOf('/') + 1);
+        vertx.fileSystem().readFile("webroot/" + fileName)
+          .onSuccess(buf -> ctx.response()
+              .putHeader("content-type", "application/javascript;charset=UTF-8")
+              .end(buf))
+          .onFailure(err -> ctx.response().setStatusCode(404).end());
       } else {
         ctx.response().setStatusCode(404).end();
       }

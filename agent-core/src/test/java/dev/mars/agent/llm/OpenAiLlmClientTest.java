@@ -7,20 +7,33 @@ import io.vertx.junit5.VertxTestContext;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 
+import java.util.List;
+
 import static org.junit.jupiter.api.Assertions.*;
 
 @ExtendWith(VertxExtension.class)
 class OpenAiLlmClientTest {
 
   @Test
-  void decide_next_returns_failed_future(Vertx vertx, VertxTestContext ctx) {
+  void constructor_accepts_tools(Vertx vertx) {
+    // Should construct without error even with an empty tool list
     var client = new OpenAiLlmClient(vertx,
-        "https://api.example.com", "sk-test", "gpt-4");
+        "https://api.example.com/v1", "sk-test", "gpt-4o", List.of());
+    assertNotNull(client);
+  }
 
-    client.decideNext(new JsonObject(), new JsonObject())
-      .onSuccess(r -> ctx.failNow("Expected failure since it's a placeholder"))
+  @Test
+  void decide_next_fails_on_unreachable_endpoint(Vertx vertx, VertxTestContext ctx) {
+    var client = new OpenAiLlmClient(vertx,
+        "http://localhost:19999", "sk-test", "gpt-4o", List.of());
+
+    client.decideNext(
+        new JsonObject().put("tradeId", "T-100").put("reason", "Missing ISIN"),
+        new JsonObject().put("step", 0))
+      .onSuccess(r -> ctx.failNow("Expected failure — endpoint is unreachable"))
       .onFailure(err -> {
-        assertTrue(err.getMessage().contains("placeholder"));
+        // Connection refused or similar network error
+        assertNotNull(err.getMessage());
         ctx.completeNow();
       });
   }

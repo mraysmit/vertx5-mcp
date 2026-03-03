@@ -124,17 +124,17 @@ public class MainVerticle extends AbstractVerticle {
     String agent   = cfg.addresses().agent();
     String events  = cfg.addresses().events();
 
-    // ── Resolve LLM client via factory ──────────────────────────────
-    LlmClient llm = LlmClientFactory.create(
-        cfg.llm().type(), cfg.llm().params(), vertx);
-    LOG.info("LLM client resolved: " + llm.getClass().getSimpleName());
-
-    // ── Resolve tools via factory ─────────────────────────────────────────
+    // ── Resolve tools via factory (before LLM — OpenAI needs tool schemas) ──
     Tool[] toolArray = cfg.tools().stream()
         .map(tc -> ToolFactory.create(tc.type(), vertx, events))
         .toArray(Tool[]::new);
     var tools = ToolRegistry.of(toolArray);
     LOG.info("Tools resolved: " + tools.keySet());
+
+    // ── Resolve LLM client via factory ──────────────────────────────
+    LlmClient llm = LlmClientFactory.create(
+        cfg.llm().type(), cfg.llm().params(), vertx, tools.values());
+    LOG.info("LLM client resolved: " + llm.getClass().getSimpleName());
 
     // ── Resolve handlers via factory ──────────────────────────────────────
     Map<String, FailureHandler> failureHandlers = new LinkedHashMap<>();
