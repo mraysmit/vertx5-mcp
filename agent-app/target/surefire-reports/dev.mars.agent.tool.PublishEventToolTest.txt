@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: dev.mars.agent.tool.PublishEventToolTest
--------------------------------------------------------------------------------
-Tests run: 6, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.131 s -- in dev.mars.agent.tool.PublishEventToolTest

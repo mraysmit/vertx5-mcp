@@ -84,17 +84,19 @@ public class StubLlmClient implements LlmClient {
   @Override
   public Future<JsonObject> decideNext(JsonObject event, JsonObject state) {
     String reason = event.getString("reason", "<none>");
-    LOG.info("StubLlmClient evaluating " + rules.size() + " rules for reason='" + reason + "'");
+    LOG.info("StubLlmClient evaluating " + rules.size() + " rules for reason='" + reason
+        + "' step=" + (state != null ? state.getInteger("step", 0) : 0));
 
     for (StubRule rule : rules) {
-      JsonObject cmd = rule.tryMatch(event);
+      JsonObject cmd = rule.tryMatch(event, state);
       if (cmd != null) {
-        LOG.info("Stub rule matched: tool=" + cmd.getString("tool") + " stop=" + cmd.getBoolean("stop", true));
+        LOG.info("Stub rule matched: tool=" + cmd.getString("tool")
+            + " stop=" + cmd.getBoolean("stop", true));
         return Future.succeededFuture(cmd);
       }
     }
 
     LOG.info("No stub rule matched for reason='" + reason + "' — using fallback");
-    return Future.succeededFuture(fallback.tryMatch(event));
+    return Future.succeededFuture(fallback.tryMatch(event, state));
   }
 }

@@ -1,5 +1,8 @@
 package dev.mars.agent.config;
 
+import dev.mars.agent.tool.ClassifyTool;
+import dev.mars.agent.tool.LookupTool;
+import dev.mars.agent.tool.NotifyTool;
 import dev.mars.agent.tool.PublishEventTool;
 import dev.mars.agent.tool.RaiseTicketTool;
 import dev.mars.mcp.tool.Tool;
@@ -47,6 +50,9 @@ public final class ToolFactory {
     Tool tool = switch (type) {
       case "publish-event" -> new PublishEventTool(vertx, eventsAddress);
       case "raise-ticket"  -> new RaiseTicketTool(vertx, eventsAddress);
+      case "lookup"         -> new LookupTool();
+      case "classify"       -> new ClassifyTool(vertx, eventsAddress);
+      case "notify"         -> new NotifyTool(vertx, eventsAddress);
 
       default -> {
         LOG.severe("Unknown tool type: " + type);

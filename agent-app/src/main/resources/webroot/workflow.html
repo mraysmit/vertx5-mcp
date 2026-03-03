@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Workflow Runner — vertx5-mcp</title>
+  <style>
+    /* ── Reset & Theme ──────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0d1117; --surface: #161b22; --border: #30363d;
+      --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff;
+      --green: #3fb950; --orange: #d29922; --red: #f85149;
+      --purple: #bc8cff; --teal: #39d2c0; --pink: #f778ba;
+      --blue: #58a6ff; --yellow: #e3b341;
+    }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      background: var(--bg); color: var(--text); height: 100vh; overflow: hidden; }
+
+    /* ── Layout ─────────────────────────────────────────────────── */
+    .app { display: grid; grid-template-columns: 320px 1fr 380px;
+      grid-template-rows: auto 1fr; height: 100vh; }
+    header { grid-column: 1 / -1; padding: 12px 20px; background: var(--surface);
+      border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 16px; }
+    header h1 { font-size: 16px; font-weight: 600; }
+    header .subtitle { color: var(--muted); font-size: 13px; }
+
+    /* ── Left Panel: Control ────────────────────────────────────── */
+    .control-panel { background: var(--surface); border-right: 1px solid var(--border);
+      padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 16px;
+      min-height: 0; }
+    .control-panel h2 { font-size: 14px; font-weight: 600; color: var(--accent); text-transform: uppercase;
+      letter-spacing: 0.5px; margin-bottom: 4px; }
+
+    .form-group { display: flex; flex-direction: column; gap: 4px; }
+    .form-group label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; }
+    .form-group input, .form-group select, .form-group textarea {
+      background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+      padding: 8px 10px; color: var(--text); font-size: 13px; font-family: inherit; }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+      outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(88,166,255,0.2); }
+
+    .scenarios { display: flex; flex-direction: column; gap: 6px; }
+    .scenario-btn { background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+      padding: 8px 12px; color: var(--text); font-size: 12px; cursor: pointer; text-align: left;
+      transition: border-color 0.15s, background 0.15s; }
+    .scenario-btn:hover { border-color: var(--accent); background: rgba(88,166,255,0.08); }
+    .scenario-btn .scenario-label { font-weight: 600; display: block; }
+    .scenario-btn .scenario-desc { color: var(--muted); font-size: 11px; margin-top: 2px; }
+
+    .run-btn { background: var(--green); color: #000; border: none; border-radius: 6px;
+      padding: 10px 16px; font-size: 14px; font-weight: 600; cursor: pointer;
+      transition: opacity 0.15s; }
+    .run-btn:hover { opacity: 0.9; }
+    .run-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .run-btn.running { background: var(--orange); }
+
+    .reset-btn { background: transparent; color: var(--muted); border: 1px solid var(--border);
+      border-radius: 6px; padding: 8px 16px; font-size: 13px; cursor: pointer; }
+    .reset-btn:hover { border-color: var(--accent); color: var(--text); }
+
+    /* ── Center: Flow Diagram ───────────────────────────────────── */
+    .flow-panel { padding: 24px; overflow: auto; display: flex;
+      flex-direction: column; align-items: center; justify-content: flex-start; gap: 0;
+      min-height: 0; }
+
+    .flow-stage { display: flex; align-items: center; gap: 0; flex-direction: column; }
+
+    .stage-node { position: relative; border: 2px solid var(--border); border-radius: 10px;
+      padding: 14px 24px; min-width: 220px; text-align: center;
+      background: var(--surface); transition: all 0.4s ease; }
+    .stage-node .stage-icon { font-size: 20px; margin-bottom: 4px; }
+    .stage-node .stage-title { font-size: 13px; font-weight: 600; }
+    .stage-node .stage-detail { font-size: 11px; color: var(--muted); margin-top: 2px; word-break: break-all; }
+
+    .stage-node.idle { opacity: 0.5; }
+    .stage-node.active { border-color: var(--accent); box-shadow: 0 0 16px rgba(88,166,255,0.35);
+      animation: pulse 1.2s infinite alternate; }
+    .stage-node.done { border-color: var(--green); opacity: 1; }
+    .stage-node.done .stage-title { color: var(--green); }
+    .stage-node.error { border-color: var(--red); opacity: 1; }
+    .stage-node.error .stage-title { color: var(--red); }
+    .stage-node.skipped { opacity: 0.3; border-style: dashed; }
+
+    @keyframes pulse { from { box-shadow: 0 0 8px rgba(88,166,255,0.2); } to { box-shadow: 0 0 20px rgba(88,166,255,0.5); } }
+
+    .flow-arrow { width: 2px; height: 28px; background: var(--border); position: relative; }
+    .flow-arrow.active { background: var(--accent); }
+    .flow-arrow.done { background: var(--green); }
+    .flow-arrow::after { content: '▼'; position: absolute; bottom: -8px; left: 50%;
+      transform: translateX(-50%); font-size: 10px; color: inherit; }
+    .flow-arrow.active::after { color: var(--accent); }
+    .flow-arrow.done::after { color: var(--green); }
+
+    .flow-branch { display: flex; gap: 24px; align-items: flex-start; justify-content: center; }
+    .flow-branch-arm { display: flex; flex-direction: column; align-items: center; gap: 0; }
+    .branch-label { font-size: 11px; font-weight: 600; color: var(--muted); margin-bottom: 6px;
+      text-transform: uppercase; letter-spacing: 0.5px; }
+    .branch-label.active { color: var(--accent); }
+    .branch-label.done { color: var(--green); }
+
+    /* sub-steps within agent arm */
+    .sub-steps { display: flex; flex-direction: column; align-items: center; gap: 0; margin-top: 0; }
+    .sub-step { border: 1px solid var(--border); border-radius: 6px; padding: 8px 14px;
+      min-width: 200px; max-width: 320px; text-align: center; background: var(--surface); font-size: 12px;
+      transition: all 0.3s; }
+    .sub-step.active { border-color: var(--purple); box-shadow: 0 0 10px rgba(188,140,255,0.3); }
+    .sub-step.done { border-color: var(--green); }
+    .sub-step .sub-step-title { font-weight: 600; }
+    .sub-step .sub-step-reasoning { font-size: 10px; color: var(--purple); margin-top: 3px;
+      font-style: italic; line-height: 1.3; text-align: left; opacity: 0.85;
+      max-height: 2.6em; overflow: hidden; }
+    .sub-step.done .sub-step-reasoning { color: var(--muted); }
+
+    /* reasoning iteration group — pairs reasoning + tool in a visual group */
+    .iteration-group { border: 1px dashed var(--border); border-radius: 8px; padding: 6px 4px;
+      margin-top: 4px; position: relative; }
+    .iteration-group .iteration-label { position: absolute; top: -8px; left: 12px;
+      background: var(--bg); padding: 0 6px; font-size: 9px; font-weight: 700;
+      color: var(--purple); text-transform: uppercase; letter-spacing: 0.5px; }
+    .iteration-group.done { border-color: var(--green); }
+    .iteration-group.done .iteration-label { color: var(--green); }
+
+    /* ── Right Panel: Event Log ─────────────────────────────────── */
+    .event-panel { background: var(--surface); border-left: 1px solid var(--border);
+      display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+    .event-panel h2 { font-size: 14px; font-weight: 600; color: var(--accent); text-transform: uppercase;
+      letter-spacing: 0.5px; padding: 16px 16px 8px; }
+    .event-log { flex: 1; overflow-y: auto; padding: 0 16px 16px; display: flex;
+      flex-direction: column; gap: 6px; min-height: 0; }
+    .event-entry { border: 1px solid var(--border); border-radius: 6px; padding: 10px 12px;
+      font-size: 12px; font-family: 'SF Mono', 'Cascadia Code', 'Fira Code', monospace;
+      background: var(--bg); animation: fadeIn 0.3s ease; }
+    .event-entry .event-time { color: var(--muted); font-size: 10px; display: block; margin-bottom: 4px; }
+    .event-entry .event-stage { font-weight: 600; margin-bottom: 2px; }
+    .event-entry .event-data { color: var(--muted); white-space: pre-wrap; word-break: break-all; font-size: 11px; }
+    .event-entry.stage-http       { border-left: 3px solid var(--blue); }
+    .event-entry.stage-bus        { border-left: 3px solid var(--green); }
+    .event-entry.stage-processor  { border-left: 3px solid var(--orange); }
+    .event-entry.stage-agent      { border-left: 3px solid var(--purple); }
+    .event-entry.stage-tool       { border-left: 3px solid var(--teal); }
+    .event-entry.stage-event      { border-left: 3px solid var(--pink); }
+    .event-entry.stage-result     { border-left: 3px solid var(--green); }
+    .event-entry.stage-error      { border-left: 3px solid var(--red); }
+    .event-entry.stage-reasoning   { border-left: 3px solid var(--purple); background: rgba(188,140,255,0.06); }
+    .event-entry.stage-reasoning .event-stage { color: var(--purple); }
+
+    /* reasoning blockquote inside event log */
+    .reasoning-quote { background: rgba(188,140,255,0.08); border-left: 2px solid var(--purple);
+      padding: 6px 10px; margin: 6px 0 4px; border-radius: 0 4px 4px 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+      font-size: 12px; line-height: 1.5; color: var(--text); font-style: italic; }
+    .reasoning-action { display: flex; align-items: center; gap: 6px; margin-top: 6px;
+      font-size: 11px; color: var(--teal); font-family: 'SF Mono', 'Cascadia Code', monospace; }
+    .reasoning-action .action-arrow { color: var(--muted); }
+
+    /* tool result summary inside event log */
+    .tool-summary { margin-top: 4px; font-size: 11px; }
+    .tool-summary .tool-kv { display: flex; gap: 4px; }
+    .tool-summary .tool-key { color: var(--muted); min-width: 60px; }
+    .tool-summary .tool-val { color: var(--text); }
+    .tool-detail-toggle { color: var(--accent); cursor: pointer; font-size: 10px;
+      margin-top: 4px; display: inline-block; border: none; background: none;
+      font-family: inherit; text-decoration: underline; }
+    .tool-detail-json { display: none; margin-top: 4px; font-size: 10px;
+      color: var(--muted); white-space: pre-wrap; word-break: break-all; }
+    .tool-detail-json.expanded { display: block; }
+
+    /* continue indicator */
+    .event-entry.stage-continue { border-left: 3px solid var(--orange);
+      background: rgba(210,153,34,0.06); font-style: italic; }
+
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ── Response Overlay ──────────────────────────────────────── */
+    .response-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.7); z-index: 100; align-items: center; justify-content: center; }
+    .response-overlay.visible { display: flex; }
+    .response-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+      padding: 24px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto; }
+    .response-card h3 { font-size: 16px; margin-bottom: 12px; }
+    .response-card pre { background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+      padding: 12px; font-size: 12px; overflow-x: auto; white-space: pre-wrap; }
+    .response-card .close-btn { margin-top: 16px; background: var(--accent); color: #000; border: none;
+      border-radius: 6px; padding: 8px 24px; cursor: pointer; font-weight: 600; }
+
+    /* ── Summary bar ───────────────────────────────────────────── */
+    .summary-bar { padding: 10px 16px; border-top: 1px solid var(--border);
+      font-size: 12px; color: var(--muted); display: flex; justify-content: space-between; }
+    .summary-bar .path-badge { padding: 2px 8px; border-radius: 4px; font-weight: 600; font-size: 11px; }
+    .summary-bar .path-deterministic { background: rgba(210,153,34,0.2); color: var(--orange); }
+    .summary-bar .path-agent { background: rgba(188,140,255,0.2); color: var(--purple); }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- ─── Header ──────────────────────────────────────────────── -->
+    <header>
+      <h1>⚡ Workflow Runner</h1>
+      <span class="subtitle">Submit trade failures and watch the pipeline process them in real-time</span>
+      <span class="subtitle" style="margin-left:auto;">
+        <a href="/ui/" style="color:var(--accent);text-decoration:none;">← Pipeline Config</a>
+      </span>
+    </header>
+
+    <!-- ─── Left: Control Panel ─────────────────────────────────── -->
+    <div class="control-panel">
+      <div>
+        <h2>Scenarios</h2>
+        <div class="scenarios">
+          <button class="scenario-btn" onclick="loadScenario('missing-isin')">
+            <span class="scenario-label">🔍 Missing ISIN</span>
+            <span class="scenario-desc">Deterministic → Lookup &amp; Enrich → TradeRepaired</span>
+          </button>
+          <button class="scenario-btn" onclick="loadScenario('invalid-cpty')">
+            <span class="scenario-label">⚠️ Invalid Counterparty</span>
+            <span class="scenario-desc">Deterministic → Escalate → TradeEscalated</span>
+          </button>
+          <button class="scenario-btn" onclick="loadScenario('lei-not-found')">
+            <span class="scenario-label">🤖 LEI Not Found</span>
+            <span class="scenario-desc">Agent → Lookup → Classify → Raise Ticket (3-step chain)</span>
+          </button>
+          <button class="scenario-btn" onclick="loadScenario('unknown')">
+            <span class="scenario-label">🧠 Unknown Reason</span>
+            <span class="scenario-desc">Agent → Lookup → Classify → Notify Ops (3-step chain)</span>
+          </button>
+          <button class="scenario-btn" onclick="loadScenario('amount-mismatch')">
+            <span class="scenario-label">💱 Settlement Mismatch</span>
+            <span class="scenario-desc">Agent → Lookup → Classify (FX analysis) → Ticket → Notify (4-step)</span>
+          </button>
+          <button class="scenario-btn" onclick="loadScenario('duplicate')">
+            <span class="scenario-label">👯 Duplicate Trade</span>
+            <span class="scenario-desc">Agent → Lookup → Classify (cross-ref) → Ticket → PagerDuty (4-step)</span>
+          </button>
+          <button class="scenario-btn" onclick="loadScenario('regulatory')">
+            <span class="scenario-label">⏰ Regulatory Deadline</span>
+            <span class="scenario-desc">Agent → Lookup → Classify (SEC T+1) → Ticket → PagerDuty (4-step)</span>
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <h2>Request</h2>
+        <div class="form-group">
+          <label>Trade ID</label>
+          <input type="text" id="tradeId" value="T-100" placeholder="e.g. T-100">
+        </div>
+        <div class="form-group" style="margin-top:8px;">
+          <label>Reason</label>
+          <input type="text" id="reason" value="Missing ISIN" placeholder="e.g. Missing ISIN">
+        </div>
+        <div class="form-group" style="margin-top:8px;">
+          <label>Alt IDs (optional)</label>
+          <input type="text" id="altIds" value="" placeholder="e.g. CUSIP-123">
+        </div>
+      </div>
+
+      <button class="run-btn" id="runBtn" onclick="runWorkflow()">▶ Run Workflow</button>
+      <button class="reset-btn" onclick="resetAll()">Reset</button>
+
+      <div class="summary-bar" id="summaryBar" style="display:none;">
+        <span id="summaryText"></span>
+        <span id="summaryPath"></span>
+      </div>
+    </div>
+
+    <!-- ─── Center: Flow Diagram ────────────────────────────────── -->
+    <div class="flow-panel">
+      <!-- 1. HTTP Ingress -->
+      <div class="flow-stage">
+        <div class="stage-node idle" id="stage-http">
+          <div class="stage-icon">🌐</div>
+          <div class="stage-title">HTTP Ingress</div>
+          <div class="stage-detail" id="stage-http-detail">POST /trade/failures</div>
+        </div>
+      </div>
+      <div class="flow-arrow" id="arrow-1"></div>
+
+      <!-- 2. Event Bus -->
+      <div class="flow-stage">
+        <div class="stage-node idle" id="stage-bus">
+          <div class="stage-icon">📨</div>
+          <div class="stage-title">Event Bus</div>
+          <div class="stage-detail" id="stage-bus-detail">trade.failures</div>
+        </div>
+      </div>
+      <div class="flow-arrow" id="arrow-2"></div>
+
+      <!-- 3. Processor -->
+      <div class="flow-stage">
+        <div class="stage-node idle" id="stage-processor">
+          <div class="stage-icon">⚙️</div>
+          <div class="stage-title">Failure Processor</div>
+          <div class="stage-detail" id="stage-processor-detail">Route by reason</div>
+        </div>
+      </div>
+      <div class="flow-arrow" id="arrow-3"></div>
+
+      <!-- 4. Branch: Deterministic vs Agent -->
+      <div class="flow-branch">
+        <!-- Deterministic Arm -->
+        <div class="flow-branch-arm" id="arm-deterministic">
+          <div class="branch-label" id="label-deterministic">Deterministic</div>
+          <div class="stage-node idle" id="stage-handler" style="min-width:180px;">
+            <div class="stage-icon">🔧</div>
+            <div class="stage-title">Handler</div>
+            <div class="stage-detail" id="stage-handler-detail"></div>
+          </div>
+        </div>
+        <!-- Agent Arm -->
+        <div class="flow-branch-arm" id="arm-agent">
+          <div class="branch-label" id="label-agent">Agent</div>
+          <div class="stage-node idle" id="stage-agent" style="min-width:180px;">
+            <div class="stage-icon">🤖</div>
+            <div class="stage-title">Agent Runner</div>
+            <div class="stage-detail" id="stage-agent-detail"></div>
+          </div>
+          <div class="sub-steps" id="agent-sub-steps">
+            <!-- dynamically added -->
+          </div>
+        </div>
+      </div>
+      <div class="flow-arrow" id="arrow-4"></div>
+
+      <!-- 5. Event Sink -->
+      <div class="flow-stage">
+        <div class="stage-node idle" id="stage-eventsink">
+          <div class="stage-icon">📤</div>
+          <div class="stage-title">Event Sink</div>
+          <div class="stage-detail" id="stage-eventsink-detail">events.out</div>
+        </div>
+      </div>
+      <div class="flow-arrow" id="arrow-5"></div>
+
+      <!-- 6. Result -->
+      <div class="flow-stage">
+        <div class="stage-node idle" id="stage-result">
+          <div class="stage-icon">✅</div>
+          <div class="stage-title">Result</div>
+          <div class="stage-detail" id="stage-result-detail"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ─── Right: Event Log ────────────────────────────────────── -->
+    <div class="event-panel">
+      <h2>Event Log</h2>
+      <div class="event-log" id="eventLog">
+        <div style="color:var(--muted);font-size:12px;padding:20px 0;text-align:center;">
+          Select a scenario and click <b>Run Workflow</b> to begin
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ─── Response Overlay ──────────────────────────────────────── -->
+  <div class="response-overlay" id="responseOverlay">
+    <div class="response-card">
+      <h3>Workflow Result</h3>
+      <pre id="responseJson"></pre>
+      <button class="close-btn" onclick="closeOverlay()">Close</button>
+    </div>
+  </div>
+
+  <script>
+    // ── State ────────────────────────────────────────────────────────
+    let running = false;
+    let eventSource = null;
+    let runCounter = 0;
+
+    const scenarios = {
+      'missing-isin':    { tradeId: 'T-100', reason: 'Missing ISIN',                altIds: '' },
+      'invalid-cpty':    { tradeId: 'T-200', reason: 'Invalid Counterparty',        altIds: '' },
+      'lei-not-found':   { tradeId: 'T-300', reason: 'LEI not found',               altIds: '' },
+      'unknown':         { tradeId: 'T-400', reason: 'Suspicious pattern',          altIds: '' },
+      'amount-mismatch': { tradeId: 'T-500', reason: 'Settlement amount mismatch',  altIds: '' },
+      'duplicate':       { tradeId: 'T-600', reason: 'Possible duplicate trade',    altIds: '' },
+      'regulatory':      { tradeId: 'T-700', reason: 'Regulatory T+1 deadline at risk', altIds: '' },
+    };
+
+    // ── Scenario loader ──────────────────────────────────────────────
+    function loadScenario(key) {
+      const s = scenarios[key];
+      if (!s) return;
+      document.getElementById('tradeId').value = s.tradeId;
+      document.getElementById('reason').value = s.reason;
+      document.getElementById('altIds').value = s.altIds;
+      // highlight the clicked button
+      document.querySelectorAll('.scenario-btn').forEach(b => b.style.borderColor = '');
+      event.currentTarget.style.borderColor = 'var(--accent)';
+    }
+
+    // ── Reset ────────────────────────────────────────────────────────
+    function resetAll() {
+      if (eventSource) { eventSource.close(); eventSource = null; }
+      running = false;
+      document.getElementById('runBtn').disabled = false;
+      document.getElementById('runBtn').textContent = '▶ Run Workflow';
+      document.getElementById('runBtn').classList.remove('running');
+      document.getElementById('summaryBar').style.display = 'none';
+      // reset stages
+      document.querySelectorAll('.stage-node').forEach(n => {
+        n.className = 'stage-node idle';
+        const det = n.querySelector('.stage-detail');
+        if (det) det.textContent = det.dataset.default || det.textContent;
+      });
+      document.querySelectorAll('.flow-arrow').forEach(a => a.className = 'flow-arrow');
+      document.querySelectorAll('.branch-label').forEach(l => l.className = 'branch-label');
+      document.getElementById('agent-sub-steps').innerHTML = '';
+      // save defaults
+      saveDefaults();
+      // reset event log
+      document.getElementById('eventLog').innerHTML =
+        '<div style="color:var(--muted);font-size:12px;padding:20px 0;text-align:center;">' +
+        'Select a scenario and click <b>Run Workflow</b> to begin</div>';
+    }
+
+    function saveDefaults() {
+      document.querySelectorAll('.stage-detail').forEach(d => {
+        if (!d.dataset.default) d.dataset.default = d.textContent;
+      });
+    }
+    saveDefaults();
+
+    // ── Stage updates ────────────────────────────────────────────────
+    function setStage(id, state, detail) {
+      const node = document.getElementById('stage-' + id);
+      if (!node) return;
+      node.className = 'stage-node ' + state;
+      if (detail) {
+        const det = node.querySelector('.stage-detail');
+        if (det) det.textContent = detail;
+      }
+    }
+
+    function setArrow(id, state) {
+      const arrow = document.getElementById('arrow-' + id);
+      if (arrow) arrow.className = 'flow-arrow ' + state;
+    }
+
+    function setBranchLabel(branch, state) {
+      const label = document.getElementById('label-' + branch);
+      if (label) label.className = 'branch-label ' + state;
+    }
+
+    function addAgentSubStep(title, state, reasoning) {
+      const container = document.getElementById('agent-sub-steps');
+      const arrow = document.createElement('div');
+      arrow.className = 'flow-arrow ' + (state === 'done' ? 'done' : 'active');
+      arrow.style.height = '18px';
+      container.appendChild(arrow);
+
+      const step = document.createElement('div');
+      step.className = 'sub-step ' + state;
+      const titleDiv = document.createElement('div');
+      titleDiv.className = 'sub-step-title';
+      titleDiv.textContent = title;
+      step.appendChild(titleDiv);
+      if (reasoning) {
+        const reasonDiv = document.createElement('div');
+        reasonDiv.className = 'sub-step-reasoning';
+        reasonDiv.textContent = '"' + reasoning + '"';
+        step.appendChild(reasonDiv);
+      }
+      container.appendChild(step);
+      return step;
+    }
+
+    function startIterationGroup(stepLabel) {
+      const container = document.getElementById('agent-sub-steps');
+      const group = document.createElement('div');
+      group.className = 'iteration-group';
+      group.id = 'iter-group-' + stepLabel;
+      const label = document.createElement('div');
+      label.className = 'iteration-label';
+      label.textContent = stepLabel;
+      group.appendChild(label);
+      container.appendChild(group);
+      return group;
+    }
+
+    function addSubStepToGroup(group, title, state, reasoning) {
+      const arrow = document.createElement('div');
+      arrow.className = 'flow-arrow ' + (state === 'done' ? 'done' : 'active');
+      arrow.style.height = '14px';
+      group.appendChild(arrow);
+
+      const step = document.createElement('div');
+      step.className = 'sub-step ' + state;
+      const titleDiv = document.createElement('div');
+      titleDiv.className = 'sub-step-title';
+      titleDiv.textContent = title;
+      step.appendChild(titleDiv);
+      if (reasoning) {
+        const reasonDiv = document.createElement('div');
+        reasonDiv.className = 'sub-step-reasoning';
+        reasonDiv.textContent = '"' + reasoning + '"';
+        step.appendChild(reasonDiv);
+      }
+      group.appendChild(step);
+      return step;
+    }
+
+    // ── Event log ────────────────────────────────────────────────────
+    function logEvent(stage, title, detail, cssClass) {
+      const log = document.getElementById('eventLog');
+      // remove placeholder
+      if (log.querySelector('div[style]')) log.innerHTML = '';
+
+      const entry = document.createElement('div');
+      entry.className = 'event-entry stage-' + (cssClass || stage);
+
+      const time = new Date().toLocaleTimeString('en-GB', { hour12: false, fractionalSecondDigits: 3 });
+      entry.innerHTML =
+        '<span class="event-time">' + time + '</span>' +
+        '<div class="event-stage">' + escapeHtml(title) + '</div>' +
+        (detail ? '<div class="event-data">' + escapeHtml(detail) + '</div>' : '');
+      log.appendChild(entry);
+      entry.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+
+    /** Log a rich reasoning entry with a blockquote and action arrow */
+    function logReasoning(stepLabel, reasoning, toolName) {
+      const log = document.getElementById('eventLog');
+      if (log.querySelector('div[style]')) log.innerHTML = '';
+
+      const entry = document.createElement('div');
+      entry.className = 'event-entry stage-reasoning';
+      const time = new Date().toLocaleTimeString('en-GB', { hour12: false, fractionalSecondDigits: 3 });
+      entry.innerHTML =
+        '<span class="event-time">' + time + '</span>' +
+        '<div class="event-stage">🧠 ' + escapeHtml(stepLabel) + ' — LLM Reasoning</div>' +
+        '<div class="reasoning-quote">' + escapeHtml(reasoning || 'Deciding next action…') + '</div>' +
+        '<div class="reasoning-action"><span class="action-arrow">→</span> Calls <b>' + escapeHtml(toolName) + '</b></div>';
+      log.appendChild(entry);
+      entry.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+
+    /** Log a rich tool result entry with key/value summary and expandable JSON */
+    function logToolResult(toolName, toolIcon, toolResult) {
+      const log = document.getElementById('eventLog');
+      if (log.querySelector('div[style]')) log.innerHTML = '';
+
+      const entry = document.createElement('div');
+      entry.className = 'event-entry stage-tool';
+      const time = new Date().toLocaleTimeString('en-GB', { hour12: false, fractionalSecondDigits: 3 });
+
+      // Build key-value summary from top-level fields
+      let summaryHtml = '';
+      const skipKeys = new Set(['status']);
+      const summaryKeys = Object.keys(toolResult).filter(k => !skipKeys.has(k) && typeof toolResult[k] !== 'object').slice(0, 4);
+      for (const key of summaryKeys) {
+        summaryHtml += '<div class="tool-kv"><span class="tool-key">' + escapeHtml(key) + ':</span><span class="tool-val">' + escapeHtml(String(toolResult[key])) + '</span></div>';
+      }
+
+      const detailId = 'detail-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6);
+      entry.innerHTML =
+        '<span class="event-time">' + time + '</span>' +
+        '<div class="event-stage">' + toolIcon + ' ' + escapeHtml(toolName) + ' → ' + escapeHtml(toolResult.status || 'ok') + '</div>' +
+        (summaryHtml ? '<div class="tool-summary">' + summaryHtml + '</div>' : '') +
+        '<button class="tool-detail-toggle" onclick="document.getElementById(\'' + detailId + '\').classList.toggle(\'expanded\')">show full result</button>' +
+        '<div class="tool-detail-json" id="' + detailId + '">' + escapeHtml(JSON.stringify(toolResult, null, 2)) + '</div>';
+      log.appendChild(entry);
+      entry.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }
+
+    function escapeHtml(s) {
+      return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    }
+
+    // ── Run workflow ─────────────────────────────────────────────────
+    async function runWorkflow() {
+      if (running) return;
+      running = true;
+      runCounter++;
+      const runId = runCounter;
+
+      const btn = document.getElementById('runBtn');
+      btn.disabled = true;
+      btn.textContent = '⏳ Running…';
+      btn.classList.add('running');
+
+      // reset diagram
+      document.querySelectorAll('.stage-node').forEach(n => n.className = 'stage-node idle');
+      document.querySelectorAll('.flow-arrow').forEach(a => a.className = 'flow-arrow');
+      document.querySelectorAll('.branch-label').forEach(l => l.className = 'branch-label');
+      document.getElementById('agent-sub-steps').innerHTML = '';
+      document.getElementById('summaryBar').style.display = 'none';
+      document.getElementById('eventLog').innerHTML = '';
+
+      const tradeId = document.getElementById('tradeId').value.trim() || 'T-100';
+      const reason = document.getElementById('reason').value.trim() || 'Missing ISIN';
+      const altIds = document.getElementById('altIds').value.trim();
+
+      const payload = { tradeId, reason };
+      if (altIds) payload.altIds = altIds;
+
+      // ── Step 1: HTTP send ──────────────────────────────────────
+      logEvent('http', 'HTTP Request', 'POST /trade/failures\n' + JSON.stringify(payload, null, 2));
+      setStage('http', 'active', 'Sending POST…');
+      setArrow('1', 'active');
+      await sleep(400);
+
+      // ── Connect SSE for domain events ──────────────────────────
+      if (eventSource) eventSource.close();
+      eventSource = new EventSource('/workflow/api/events?tradeId=' + encodeURIComponent(tradeId));
+      eventSource.addEventListener('domain-event', (e) => {
+        try {
+          const evt = JSON.parse(e.data);
+          logEvent('event', '📤 ' + (evt.type || 'Event'), JSON.stringify(evt, null, 2), 'event');
+          setStage('eventsink', 'done', evt.type || 'received');
+          setArrow('4', 'done');
+        } catch (err) { /* ignore */ }
+      });
+      eventSource.addEventListener('stage', (e) => {
+        try {
+          const stage = JSON.parse(e.data);
+          handleStageEvent(stage);
+        } catch (err) { /* ignore */ }
+      });
+
+      // ── Step 2: Send to API ────────────────────────────────────
+      setStage('http', 'done', 'POST sent');
+      setStage('bus', 'active', 'trade.failures');
+      setArrow('1', 'done');
+      logEvent('bus', 'Event Bus Dispatch', 'address: trade.failures', 'bus');
+      await sleep(300);
+
+      setStage('bus', 'done');
+      setArrow('2', 'done');
+      setStage('processor', 'active', 'Routing…');
+      logEvent('processor', 'Failure Processor', 'Evaluating reason: "' + reason + '"', 'processor');
+
+      try {
+        const resp = await fetch('/workflow/api/run', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const result = await resp.json();
+
+        if (runId !== runCounter) return; // stale run
+
+        // ── Animate based on path ─────────────────────────────────
+        const path = result.path || 'unknown';
+        setStage('processor', 'done', 'Routed → ' + path);
+        setArrow('3', 'done');
+
+        if (path === 'deterministic') {
+          await animateDeterministic(result, reason);
+        } else if (path === 'agent') {
+          await animateAgent(result);
+        }
+
+        // ── Final result ──────────────────────────────────────────
+        setArrow('5', 'done');
+        setStage('result', 'done', result.status === 'ok' ? 'Success' : 'Error');
+        logEvent('result', '✅ Workflow Complete',
+          'Path: ' + path + '\n' + JSON.stringify(result, null, 2), 'result');
+
+        // summary bar
+        showSummary(path, result);
+
+      } catch (err) {
+        setStage('processor', 'error', 'Error');
+        setStage('result', 'error', err.message);
+        logEvent('error', '❌ Error', err.message, 'error');
+      } finally {
+        // close SSE after a short delay to catch late events
+        setTimeout(() => { if (eventSource) { eventSource.close(); eventSource = null; } }, 2000);
+        running = false;
+        btn.disabled = false;
+        btn.textContent = '▶ Run Workflow';
+        btn.classList.remove('running');
+      }
+    }
+
+    // ── Deterministic path animation ─────────────────────────────────
+    async function animateDeterministic(result, reason) {
+      setBranchLabel('deterministic', 'active');
+      const handlerType = reason === 'Missing ISIN' ? 'lookup-enrich' : 'escalate';
+      setStage('handler', 'active', handlerType);
+      logEvent('processor', '🔧 Deterministic Handler', 'type: ' + handlerType + '\nreason: ' + reason, 'processor');
+      await sleep(600);
+
+      setStage('handler', 'done', handlerType);
+      setBranchLabel('deterministic', 'done');
+      setStage('agent', 'skipped');
+      setBranchLabel('agent', '');
+
+      const resultEvent = result.resultEvent;
+      if (resultEvent) {
+        logEvent('event', '📤 ' + (resultEvent.type || 'Event'), JSON.stringify(resultEvent, null, 2), 'event');
+        setStage('eventsink', 'done', resultEvent.type);
+        setArrow('4', 'done');
+      }
+    }
+
+    // ── Agent path animation ─────────────────────────────────────────
+    async function animateAgent(result) {
+      setBranchLabel('agent', 'active');
+      setStage('handler', 'skipped');
+      setBranchLabel('deterministic', '');
+      setStage('agent', 'active', 'Multi-step reasoning…');
+      logEvent('agent', '🤖 Agent Runner',
+        'Forwarded to agent.required — beginning multi-step reasoning chain', 'agent');
+      await sleep(400);
+
+      const trail = result.trail || [];
+      const totalSteps = trail.length || 1;
+
+      for (let i = 0; i < trail.length; i++) {
+        const entry = trail[i];
+        const cmd = entry.command || {};
+        const toolResult = entry.toolResult || {};
+        const tool = cmd.tool || 'unknown';
+        const reasoning = cmd.reasoning || '';
+        const stop = cmd.stop;
+        const stepLabel = 'Step ' + (i + 1) + '/' + totalSteps;
+
+        const toolIcon = tool.startsWith('data.') ? '🔎'
+          : tool.startsWith('case.classify') ? '🏷️'
+          : tool.startsWith('case.raise') ? '🎫'
+          : tool.startsWith('comms.') ? '📣'
+          : '🔧';
+
+        // Create a visual iteration group in the flow diagram
+        const group = startIterationGroup(stepLabel);
+
+        // ── Reasoning phase ──────────────────────────────────
+        setStage('agent', 'active', stepLabel + ': Thinking…');
+        addSubStepToGroup(group, '🧠 Reasoning', 'active', reasoning);
+        logReasoning(stepLabel, reasoning, tool);
+        await sleep(600);
+
+        // Mark reasoning done
+        group.querySelectorAll('.sub-step').forEach(s => s.className = 'sub-step done');
+
+        // ── Tool execution phase ─────────────────────────────
+        setStage('agent', 'active', stepLabel + ': ' + tool);
+        addSubStepToGroup(group, toolIcon + ' ' + tool, 'active');
+        logToolResult(tool, toolIcon, toolResult);
+        await sleep(500);
+
+        // Mark tool done, mark iteration group done
+        group.querySelectorAll('.sub-step').forEach(s => s.className = 'sub-step done');
+        group.querySelectorAll('.flow-arrow').forEach(a => {
+          if (!a.className.includes('done')) a.className += ' done';
+        });
+        group.classList.add('done');
+
+        // ── Continue / Stop indicator ────────────────────────
+        if (!stop && i < trail.length - 1) {
+          logEvent('agent', '⏩ ' + stepLabel + ' complete — iterating',
+            'stop=false — agent feeds context forward and re-enters the reasoning loop', 'continue');
+          await sleep(250);
+        }
+      }
+
+      // If no trail, fall back to simple animation
+      if (trail.length === 0) {
+        addAgentSubStep('🧠 LLM Decision', 'done');
+        addAgentSubStep('🔧 Tool Call', 'done');
+      }
+
+      // Finalize
+      document.querySelectorAll('#agent-sub-steps .sub-step').forEach(s => s.className = 'sub-step done');
+      document.querySelectorAll('#agent-sub-steps .flow-arrow').forEach(a => {
+        if (!a.className.includes('done')) a.className += ' done';
+      });
+      setStage('agent', 'done', totalSteps + ' step' + (totalSteps > 1 ? 's' : '') + ' complete');
+      setBranchLabel('agent', 'done');
+      setArrow('4', 'done');
+      const lastResult = trail.length > 0 ? trail[trail.length - 1].toolResult : result.result;
+      setStage('eventsink', 'done', lastResult?.type || lastResult?.status || 'done');
+    }
+
+    // ── Handle stage SSE events ──────────────────────────────────────
+    function handleStageEvent(stage) {
+      const name = stage.stage || '';
+      const detail = stage.detail || '';
+      if (name === 'received' || name === 'dispatching') {
+        logEvent('bus', '📡 ' + name, detail, 'bus');
+      } else if (name === 'completed') {
+        logEvent('result', '✅ Pipeline ' + name, detail, 'result');
+      } else if (name === 'error') {
+        logEvent('error', '❌ Pipeline error', detail, 'error');
+      }
+    }
+
+    function showSummary(path, result) {
+      const bar = document.getElementById('summaryBar');
+      bar.style.display = 'flex';
+      document.getElementById('summaryText').textContent =
+        'Completed in ' + (result.resultEvent?.type || result.result?.status || 'ok');
+      const badge = document.getElementById('summaryPath');
+      badge.textContent = path;
+      badge.className = 'path-badge path-' + path;
+    }
+
+    function closeOverlay() {
+      document.getElementById('responseOverlay').classList.remove('visible');
+    }
+
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    // pre-select first scenario
+    loadScenario('missing-isin');
+  </script>
+</body>
+</html>

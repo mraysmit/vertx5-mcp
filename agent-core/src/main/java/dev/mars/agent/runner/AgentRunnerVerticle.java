@@ -7,6 +7,7 @@ import dev.mars.mcp.tool.Tool;
 import io.vertx.core.AbstractVerticle;
 import io.vertx.core.Future;
 import io.vertx.core.Promise;
+import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 
 import java.util.Map;
@@ -115,7 +116,7 @@ public class AgentRunnerVerticle extends AbstractVerticle {
       LOG.info("Agent invoked for case=" + caseId + " correlationId=" + corrId);
 
       memory.load(caseId)
-        .compose(state -> runLoop(event, new AgentContext(corrId, caseId, state), 0))
+        .compose(state -> runLoop(event, new AgentContext(corrId, caseId, state), 0, new JsonArray()))
         .onSuccess(msg::reply)
         .onFailure(err -> {
           LOG.log(Level.SEVERE, "Agent failed for case=" + caseId, err);
@@ -126,17 +127,22 @@ public class AgentRunnerVerticle extends AbstractVerticle {
     startPromise.complete();
   }
 
-  private Future<JsonObject> runLoop(JsonObject event, AgentContext ctx, int step) {
+  private Future<JsonObject> runLoop(JsonObject event, AgentContext ctx, int step, JsonArray trail) {
     if (step >= maxSteps) {
       LOG.warning("Step limit reached for case=" + ctx.caseId());
       return Future.succeededFuture(new JsonObject()
         .put("status", "error")
         .put("path", "agent")
         .put("reason", "Step limit reached (safety stop)")
+        .put("trail", trail)
         .put(caseIdField, ctx.caseId()));
     }
 
     LOG.fine("Agent step " + step + " for case=" + ctx.caseId());
+
+    // Keep the state snapshot current so the LLM can vary its behaviour
+    // across iterations (e.g. step 0 → lookup, step 1 → classify, step 2 → act).
+    ctx.state().put("step", step);
 
     // Step 1: Ask the LLM what to do — the LLM decides which tool to call
     return llm.decideNext(event, ctx.state())
@@ -149,23 +155,30 @@ public class AgentRunnerVerticle extends AbstractVerticle {
         return executeCommand(cmd, ctx);
       })
       // Step 3: Record the step in memory for audit and future LLM context
-      .compose(outcome -> memory.append(ctx.caseId(), new JsonObject()
-          .put("step", step)
-          .put("command", outcome.getJsonObject("command"))
-          .put("toolResult", outcome.getJsonObject("toolResult"))
-          .put("at", System.currentTimeMillis()))
-        .map(v -> outcome))
+      .compose(outcome -> {
+        JsonObject entry = new JsonObject()
+            .put("step", step)
+            .put("command", outcome.getJsonObject("command"))
+            .put("toolResult", outcome.getJsonObject("toolResult"))
+            .put("at", System.currentTimeMillis());
+        // Update the in-flight state so the next iteration's LLM call can
+        // see what tool was invoked and what it returned.
+        ctx.state().put("last", entry);
+        trail.add(entry);
+        return memory.append(ctx.caseId(), entry).map(v -> outcome);
+      })
       // Step 4: Loop if the LLM said stop=false, otherwise return the result
       .compose(outcome -> {
         if (!outcome.getBoolean("stop", true)) {
           LOG.info("Agent continuing to step " + (step + 1) + " for case=" + ctx.caseId());
-          return runLoop(event, ctx, step + 1);
+          return runLoop(event, ctx, step + 1, trail);
         }
         LOG.info("Agent completed for case=" + ctx.caseId() + " after " + (step + 1) + " step(s)");
         return Future.succeededFuture(new JsonObject()
           .put("status", "ok")
           .put("path", "agent")
           .put("result", outcome.getJsonObject("toolResult"))
+          .put("trail", trail)
           .put(caseIdField, ctx.caseId()));
       });
   }

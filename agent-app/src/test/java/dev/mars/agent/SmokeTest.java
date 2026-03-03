@@ -25,7 +25,9 @@ public class SmokeTest {
   private DeploymentOptions testDeploymentOptions() {
     return new DeploymentOptions().setConfig(new JsonObject()
         .put("http.port", 0)
-        .put("mcp.port", 0));
+        .put("mcp.port", 0)
+        .put("ui.port", 0)
+        .put("workflow.port", 0));
   }
 
   @Test

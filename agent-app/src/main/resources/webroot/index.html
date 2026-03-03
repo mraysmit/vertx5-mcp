@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pipeline Visualisation — vertx5-mcp</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --surface: #161b22;
+    --border: #30363d;
+    --text: #c9d1d9;
+    --text-muted: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --orange: #d29922;
+    --red: #f85149;
+    --purple: #bc8cff;
+    --teal: #39d2c0;
+    --pink: #f778ba;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 24px;
+    min-height: 100vh;
+  }
+
+  h1 {
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .subtitle {
+    color: var(--text-muted);
+    font-size: 14px;
+    margin-bottom: 24px;
+  }
+
+  .pipeline-container {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  /* ── Flow connector arrows ─────────────────────────────────── */
+  .connector {
+    display: flex;
+    justify-content: center;
+    padding: 4px 0;
+  }
+  .connector svg { display: block; }
+
+  /* ── Node cards ────────────────────────────────────────────── */
+  .node {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 20px;
+    position: relative;
+  }
+
+  .node-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+
+  .node-badge {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+
+  .badge-http     { background: rgba(88,166,255,.15); color: var(--accent); }
+  .badge-bus      { background: rgba(63,185,80,.15);  color: var(--green); }
+  .badge-handler  { background: rgba(210,153,34,.15); color: var(--orange); }
+  .badge-agent    { background: rgba(188,140,255,.15); color: var(--purple); }
+  .badge-tool     { background: rgba(57,210,192,.15); color: var(--teal); }
+  .badge-llm      { background: rgba(247,120,186,.15); color: var(--pink); }
+  .badge-mcp      { background: rgba(248,81,73,.15);  color: var(--red); }
+  .badge-event    { background: rgba(63,185,80,.15);  color: var(--green); }
+  .badge-config   { background: rgba(139,148,158,.15); color: var(--text-muted); }
+
+  .node-title {
+    font-size: 15px;
+    font-weight: 600;
+  }
+
+  .node-desc {
+    color: var(--text-muted);
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .node-meta {
+    margin-top: 10px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .meta-chip {
+    font-size: 12px;
+    background: rgba(139,148,158,.1);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 3px 8px;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+    color: var(--text-muted);
+  }
+
+  /* ── Branch layout (handlers / tools) ──────────────────────── */
+  .branch-row {
+    display: flex;
+    gap: 16px;
+    align-items: stretch;
+  }
+
+  .branch-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .branch-label {
+    text-align: center;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--text-muted);
+    padding: 8px 0 4px;
+  }
+
+  .handler-list, .tool-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .mini-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 14px;
+  }
+
+  .mini-card-title {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 4px;
+  }
+
+  .mini-card-desc {
+    font-size: 12px;
+    color: var(--text-muted);
+  }
+
+  /* ── Decision diamond ──────────────────────────────────────── */
+  .decision {
+    display: flex;
+    justify-content: center;
+    padding: 12px 0;
+  }
+
+  .diamond {
+    background: var(--surface);
+    border: 2px solid var(--orange);
+    border-radius: 6px;
+    padding: 10px 24px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--orange);
+    text-align: center;
+    transform: none; /* keep as rounded rect for readability */
+  }
+
+  /* ── Config sidebar ────────────────────────────────────────── */
+  .layout-row {
+    display: flex;
+    gap: 24px;
+    align-items: flex-start;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+
+  .main-col { flex: 1; min-width: 0; }
+
+  .sidebar {
+    width: 280px;
+    flex-shrink: 0;
+    position: sticky;
+    top: 24px;
+  }
+
+  .sidebar .node {
+    font-size: 12px;
+  }
+
+  .sidebar .node-title {
+    font-size: 14px;
+  }
+
+  .config-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .config-row:last-child { border-bottom: none; }
+
+  .config-key {
+    color: var(--text-muted);
+    font-family: 'SFMono-Regular', Consolas, monospace;
+  }
+
+  .config-val {
+    color: var(--text);
+    font-family: 'SFMono-Regular', Consolas, monospace;
+    text-align: right;
+  }
+
+  .status-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    margin-right: 6px;
+  }
+
+  .dot-green  { background: var(--green); }
+  .dot-orange { background: var(--orange); }
+  .dot-red    { background: var(--red); }
+
+  #loading {
+    text-align: center;
+    padding: 80px 0;
+    color: var(--text-muted);
+    font-size: 16px;
+  }
+
+  #error {
+    display: none;
+    text-align: center;
+    padding: 40px;
+    color: var(--red);
+  }
+
+  @media (max-width: 800px) {
+    .layout-row { flex-direction: column; }
+    .sidebar { width: 100%; position: static; }
+    .branch-row { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<div id="loading">Loading pipeline configuration…</div>
+<div id="error"></div>
+<div id="app" style="display:none">
+  <h1>Pipeline Workflow</h1>
+  <p class="subtitle">Live view of <code>pipeline.yaml</code> — loaded from <code>/api/pipeline</code></p>
+
+  <div class="layout-row">
+    <div class="main-col">
+      <div class="pipeline-container" id="pipeline"></div>
+    </div>
+    <div class="sidebar" id="sidebar"></div>
+  </div>
+</div>
+
+<script>
+(function() {
+  const API = '/api/pipeline';
+
+  fetch(API)
+    .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+    .then(cfg => render(cfg))
+    .catch(err => {
+      document.getElementById('loading').style.display = 'none';
+      const el = document.getElementById('error');
+      el.style.display = 'block';
+      el.innerHTML = '<p>Could not load pipeline config from <code>' + API + '</code></p>'
+        + '<p style="margin-top:8px;font-size:13px;color:#8b949e">' + err + '</p>';
+    });
+
+  function arrow() {
+    return '<div class="connector"><svg width="24" height="24" viewBox="0 0 24 24">'
+      + '<line x1="12" y1="2" x2="12" y2="18" stroke="#30363d" stroke-width="2"/>'
+      + '<polygon points="6,16 12,22 18,16" fill="#30363d"/>'
+      + '</svg></div>';
+  }
+
+  function chip(text) {
+    return '<span class="meta-chip">' + esc(text) + '</span>';
+  }
+
+  function esc(s) {
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function render(cfg) {
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('app').style.display = '';
+
+    const p = document.getElementById('pipeline');
+    let html = '';
+
+    // ── 1. HTTP Ingress ─────────────────────────────────────────
+    html += '<div class="node">'
+      + '<div class="node-header">'
+      +   '<span class="node-badge badge-http">HTTP</span>'
+      +   '<span class="node-title">HttpApiVerticle</span>'
+      + '</div>'
+      + '<div class="node-desc">Receives POST requests, validates required fields, sanitises payload, dispatches to event bus.</div>'
+      + '<div class="node-meta">'
+      +   chip('POST ' + cfg.http.route)
+      +   chip('port ' + cfg.http.port)
+      +   chip('timeout ' + cfg.http.requestTimeoutMs + 'ms')
+      + '</div>'
+      + '</div>';
+
+    html += arrow();
+
+    // ── 2. Event Bus (inbound) ──────────────────────────────────
+    html += '<div class="node">'
+      + '<div class="node-header">'
+      +   '<span class="node-badge badge-bus">Event Bus</span>'
+      +   '<span class="node-title">' + esc(cfg.addresses.inbound) + '</span>'
+      + '</div>'
+      + '<div class="node-desc">Inbound event bus address — request/reply from HTTP API to deterministic processor.</div>'
+      + '<div class="node-meta">'
+      +   chip('schema: ' + cfg.schema.caseIdField)
+      +   (cfg.schema.requiredFields || []).map(f => chip('required: ' + f)).join('')
+      + '</div>'
+      + '</div>';
+
+    html += arrow();
+
+    // ── 3. Deterministic Processor ──────────────────────────────
+    html += '<div class="node">'
+      + '<div class="node-header">'
+      +   '<span class="node-badge badge-handler">Processor</span>'
+      +   '<span class="node-title">DeterministicFailureProcessorVerticle</span>'
+      + '</div>'
+      + '<div class="node-desc">Matches the failure reason against deterministic handlers. If no match, forwards to the agent.</div>'
+      + '</div>';
+
+    html += arrow();
+
+    // ── 4. Decision ─────────────────────────────────────────────
+    html += '<div class="decision"><div class="diamond">Reason matches a handler?</div></div>';
+
+    // ── 5. Branch: Handlers (left) vs Agent (right) ─────────────
+    html += '<div class="branch-row">';
+
+    // Left: Handlers
+    html += '<div class="branch-col">';
+    html += '<div class="branch-label" style="color:var(--green)">✓ Yes — Deterministic</div>';
+    html += '<div class="handler-list">';
+    (cfg.handlers || []).forEach(h => {
+      let desc = 'Type: ' + h.type;
+      if (h.params) {
+        desc += ' — ' + Object.entries(h.params).map(([k,v]) => k + '=' + v).join(', ');
+      }
+      html += '<div class="mini-card">'
+        + '<div class="mini-card-title">'
+        + '<span class="node-badge badge-handler" style="font-size:10px;margin-right:6px">Handler</span>'
+        + esc(h.reason) + '</div>'
+        + '<div class="mini-card-desc">' + esc(desc) + '</div>'
+        + '</div>';
+    });
+    html += '</div></div>';
+
+    // Right: Agent
+    html += '<div class="branch-col">';
+    html += '<div class="branch-label" style="color:var(--purple)">✗ No — Agent Boundary</div>';
+
+    // Agent Runner
+    html += '<div class="node" style="margin-bottom:0">'
+      + '<div class="node-header">'
+      +   '<span class="node-badge badge-agent">Agent</span>'
+      +   '<span class="node-title">AgentRunnerVerticle</span>'
+      + '</div>'
+      + '<div class="node-desc">Step-limited agent loop. Asks the LLM what to do, executes tool calls until done.</div>'
+      + '<div class="node-meta">'
+      +   chip('maxSteps ' + cfg.agent.maxSteps)
+      +   chip('timeout ' + cfg.agent.timeoutMs + 'ms')
+      +   chip('address: ' + cfg.addresses.agent)
+      + '</div>'
+      + '</div>';
+
+    html += arrow();
+
+    // LLM Client
+    html += '<div class="node" style="margin-bottom:0">'
+      + '<div class="node-header">'
+      +   '<span class="node-badge badge-llm">LLM</span>'
+      +   '<span class="node-title">LlmClient — ' + esc(cfg.llm.type) + '</span>'
+      + '</div>'
+      + '<div class="node-desc">Decides the next action: <code>{ intent, tool, args, stop }</code></div>'
+      + '</div>';
+
+    html += arrow();
+
+    // Tools
+    html += '<div class="tool-list">';
+    (cfg.tools || []).forEach(t => {
+      html += '<div class="mini-card">'
+        + '<div class="mini-card-title">'
+        + '<span class="node-badge badge-tool" style="font-size:10px;margin-right:6px">Tool</span>'
+        + esc(t.type) + '</div>'
+        + '</div>';
+    });
+    html += '</div>';
+
+    html += '</div>'; // branch-col
+    html += '</div>'; // branch-row
+
+    html += arrow();
+
+    // ── 6. Event Sink ───────────────────────────────────────────
+    html += '<div class="node">'
+      + '<div class="node-header">'
+      +   '<span class="node-badge badge-event">Events</span>'
+      +   '<span class="node-title">EventSinkVerticle</span>'
+      + '</div>'
+      + '<div class="node-desc">Receives domain events on the event bus and logs them.</div>'
+      + '<div class="node-meta">'
+      +   chip('address: ' + cfg.addresses.events)
+      + '</div>'
+      + '</div>';
+
+    // ── 7. MCP Server (if enabled) ──────────────────────────────
+    if (cfg.mcp && cfg.mcp.enabled) {
+      html += arrow();
+      html += '<div class="node">'
+        + '<div class="node-header">'
+        +   '<span class="node-badge badge-mcp">MCP</span>'
+        +   '<span class="node-title">McpServerVerticle</span>'
+        + '</div>'
+        + '<div class="node-desc">Exposes tools via Model Context Protocol — Streamable HTTP (2025-03-26) + legacy SSE (2024-11-05).</div>'
+        + '<div class="node-meta">'
+        +   chip('port ' + cfg.mcp.port)
+        +   (cfg.mcp.basePath ? chip('basePath ' + cfg.mcp.basePath) : '')
+        +   chip('POST /mcp')
+        +   chip('GET /sse')
+        + '</div>'
+        + '</div>';
+    }
+
+    p.innerHTML = html;
+
+    // ── Sidebar: Config summary ─────────────────────────────────
+    const sb = document.getElementById('sidebar');
+    let shtml = '';
+
+    // Pipeline overview
+    shtml += '<div class="node" style="margin-bottom:16px">'
+      + '<div class="node-header"><span class="node-badge badge-config">Config</span>'
+      + '<span class="node-title">Pipeline Summary</span></div>';
+
+    const rows = [
+      ['Handlers', cfg.handlers ? cfg.handlers.length : 0],
+      ['Tools', cfg.tools ? cfg.tools.length : 0],
+      ['LLM', cfg.llm.type],
+      ['Agent max steps', cfg.agent.maxSteps],
+      ['Agent timeout', cfg.agent.timeoutMs + 'ms'],
+      ['HTTP port', cfg.http.port],
+      ['HTTP route', cfg.http.route],
+      ['Case ID field', cfg.schema.caseIdField],
+    ];
+
+    rows.forEach(([k, v]) => {
+      shtml += '<div class="config-row">'
+        + '<span class="config-key">' + esc(k) + '</span>'
+        + '<span class="config-val">' + esc(String(v)) + '</span>'
+        + '</div>';
+    });
+    shtml += '</div>';
+
+    // MCP status
+    if (cfg.mcp) {
+      shtml += '<div class="node" style="margin-bottom:16px">'
+        + '<div class="node-header"><span class="node-badge badge-mcp">MCP</span>'
+        + '<span class="node-title">MCP Server</span></div>';
+      const mcpRows = [
+        ['Status', cfg.mcp.enabled ? '● Enabled' : '○ Disabled'],
+        ['Port', cfg.mcp.port],
+        ['Base path', cfg.mcp.basePath || '(root)'],
+      ];
+      mcpRows.forEach(([k, v]) => {
+        shtml += '<div class="config-row">'
+          + '<span class="config-key">' + esc(k) + '</span>'
+          + '<span class="config-val">' + esc(String(v)) + '</span>'
+          + '</div>';
+      });
+      shtml += '</div>';
+    }
+
+    // Event bus addresses
+    shtml += '<div class="node">'
+      + '<div class="node-header"><span class="node-badge badge-bus">Event Bus</span>'
+      + '<span class="node-title">Addresses</span></div>';
+    [['inbound', cfg.addresses.inbound],
+     ['agent', cfg.addresses.agent],
+     ['events', cfg.addresses.events]
+    ].forEach(([k, v]) => {
+      shtml += '<div class="config-row">'
+        + '<span class="config-key">' + esc(k) + '</span>'
+        + '<span class="config-val">' + esc(v) + '</span>'
+        + '</div>';
+    });
+    shtml += '</div>';
+
+    sb.innerHTML = shtml;
+  }
+})();
+</script>
+</body>
+</html>

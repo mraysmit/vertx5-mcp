@@ -37,4 +37,24 @@ public interface StubRule {
    *         {@code null} to fall through to the next rule
    */
   JsonObject tryMatch(JsonObject event);
+
+  /**
+   * Evaluate the event against this rule, with access to the agent
+   * state for multi-step reasoning.
+   *
+   * <p>The default implementation ignores the state and delegates to
+   * {@link #tryMatch(JsonObject)}, so existing single-step rules work
+   * unchanged. Multi-step rules should override this method to inspect
+   * the state (e.g. step count, prior tool results) and vary their
+   * behaviour across iterations.
+   *
+   * @param event the incoming failure event
+   * @param state the agent state snapshot (contains {@code step},
+   *              {@code last}, etc.)
+   * @return a command {@link JsonObject} if this rule matches, or
+   *         {@code null} to fall through to the next rule
+   */
+  default JsonObject tryMatch(JsonObject event, JsonObject state) {
+    return tryMatch(event);
+  }
 }

@@ -20,49 +20,256 @@ class TradeFailureRuleLoaderTest {
   }
 
   @Test
-  void lei_keyword_triggers_raise_ticket() {
+  void lei_step0_triggers_lookup() {
     var loader = new TradeFailureRuleLoader();
     StubLlmClient client = loader.load().toClient();
 
     var event = new JsonObject()
         .put("tradeId", "T-1")
         .put("reason", "LEI not found");
+    var state = new JsonObject().put("step", 0);
 
-    var result = client.decideNext(event, new JsonObject()).result();
+    var result = client.decideNext(event, state).result();
     assertEquals("CALL_TOOL", result.getString("intent"));
-    assertEquals("case.raiseTicket", result.getString("tool"));
-    assertTrue(result.getBoolean("stop"));
+    assertEquals("data.lookup", result.getString("tool"));
+    assertFalse(result.getBoolean("stop"));
   }
 
   @Test
-  void non_lei_reason_falls_back_to_escalation() {
+  void lei_step1_triggers_classify() {
+    var loader = new TradeFailureRuleLoader();
+    StubLlmClient client = loader.load().toClient();
+
+    var event = new JsonObject()
+        .put("tradeId", "T-1")
+        .put("reason", "LEI not found");
+    var state = new JsonObject().put("step", 1);
+
+    var result = client.decideNext(event, state).result();
+    assertEquals("CALL_TOOL", result.getString("intent"));
+    assertEquals("case.classify", result.getString("tool"));
+    assertFalse(result.getBoolean("stop"));
+  }
+
+  @Test
+  void lei_step2_triggers_raise_ticket() {
+    var loader = new TradeFailureRuleLoader();
+    StubLlmClient client = loader.load().toClient();
+
+    var event = new JsonObject()
+        .put("tradeId", "T-1")
+        .put("reason", "LEI not found");
+    var state = new JsonObject().put("step", 2);
+
+    var result = client.decideNext(event, state).result();
+    assertEquals("CALL_TOOL", result.getString("intent"));
+    assertEquals("case.raiseTicket", result.getString("tool"));
+    assertTrue(result.getBoolean("stop"));
+    JsonObject args = result.getJsonObject("args");
+    assertEquals("T-1", args.getString("tradeId"));
+    assertNotNull(args.getString("detail"));
+  }
+
+  @Test
+  void fallback_step0_triggers_lookup() {
     var loader = new TradeFailureRuleLoader();
     StubLlmClient client = loader.load().toClient();
 
     var event = new JsonObject()
         .put("tradeId", "T-2")
         .put("reason", "Unknown error XYZ");
+    var state = new JsonObject().put("step", 0);
 
-    var result = client.decideNext(event, new JsonObject()).result();
+    var result = client.decideNext(event, state).result();
     assertEquals("CALL_TOOL", result.getString("intent"));
-    assertEquals("events.publish", result.getString("tool"));
-    assertTrue(result.getBoolean("stop"));
+    assertEquals("data.lookup", result.getString("tool"));
+    assertFalse(result.getBoolean("stop"));
   }
 
   @Test
-  void lei_rule_includes_ticket_args() {
+  void fallback_step2_triggers_notify() {
     var loader = new TradeFailureRuleLoader();
     StubLlmClient client = loader.load().toClient();
 
     var event = new JsonObject()
-        .put("tradeId", "T-3")
-        .put("reason", "Counterparty LEI mismatch");
+        .put("tradeId", "T-2")
+        .put("reason", "Unknown error XYZ");
+    var state = new JsonObject().put("step", 2);
 
-    var result = client.decideNext(event, new JsonObject()).result();
-    JsonObject args = result.getJsonObject("args");
-    assertEquals("T-3", args.getString("tradeId"));
-    assertEquals("ReferenceData", args.getString("category"));
-    assertNotNull(args.getString("summary"));
-    assertNotNull(args.getString("detail"));
+    var result = client.decideNext(event, state).result();
+    assertEquals("CALL_TOOL", result.getString("intent"));
+    assertEquals("comms.notify", result.getString("tool"));
+    assertTrue(result.getBoolean("stop"));
+  }
+
+  // ── Settlement Amount Mismatch rule ───────────────────────────────
+
+  @Test
+  void mismatch_step0_triggers_lookup() {
+    var loader = new TradeFailureRuleLoader();
+    StubLlmClient client = loader.load().toClient();
+
+    var event = new JsonObject()
+        .put("tradeId", "T-500")
+        .put("reason", "Settlement amount mismatch");
+    var state = new JsonObject().put("step", 0);
+
+    var result = client.decideNext(event, state).result();
+    assertEquals("CALL_TOOL", result.getString("intent"));
+    assertEquals("data.lookup", result.getString("tool"));
+    assertFalse(result.getBoolean("stop"));
+    assertNotNull(result.getString("reasoning"));
+  }
+
+  @Test
+  void mismatch_step1_triggers_classify() {
+    var loader = new TradeFailureRuleLoader();
+    StubLlmClient client = loader.load().toClient();
+
+    var event = new JsonObject()
+        .put("tradeId", "T-500")
+        .put("reason", "Settlement amount mismatch");
+    var state = new JsonObject().put("step", 1);
+
+    var result = client.decideNext(event, state).result();
+    assertEquals("CALL_TOOL", result.getString("intent"));
+    assertEquals("case.classify", result.getString("tool"));
+    assertEquals("HIGH", result.getJsonObject("args").getString("severity"));
+    assertEquals("Settlement", result.getJsonObject("args").getString("category"));
+    assertFalse(result.getBoolean("stop"));
+  }
+
+  @Test
+  void mismatch_step2_triggers_ticket() {
+    var loader = new TradeFailureRuleLoader();
+    StubLlmClient client = loader.load().toClient();
+
+    var event = new JsonObject()
+        .put("tradeId", "T-500")
+        .put("reason", "Settlement amount mismatch");
+    var state = new JsonObject().put("step", 2);
+
+    var result = client.decideNext(event, state).result();
+    assertEquals("CALL_TOOL", result.getString("intent"));
+    assertEquals("case.raiseTicket", result.getString("tool"));
+    assertFalse(result.getBoolean("stop"));
+  }
+
+  @Test
+  void mismatch_step3_triggers_notify_and_stops() {
+    var loader = new TradeFailureRuleLoader();
+    StubLlmClient client = loader.load().toClient();
+
+    var event = new JsonObject()
+        .put("tradeId", "T-500")
+        .put("reason", "Settlement amount mismatch");
+    var state = new JsonObject().put("step", 3);
+
+    var result = client.decideNext(event, state).result();
+    assertEquals("CALL_TOOL", result.getString("intent"));
+    assertEquals("comms.notify", result.getString("tool"));
+    assertTrue(result.getBoolean("stop"));
+    assertEquals("pagerduty", result.getJsonObject("args").getString("channel"));
+  }
+
+  // ── Duplicate Trade rule ──────────────────────────────────────────
+
+  @Test
+  void duplicate_step0_triggers_lookup() {
+    var loader = new TradeFailureRuleLoader();
+    StubLlmClient client = loader.load().toClient();
+
+    var event = new JsonObject()
+        .put("tradeId", "T-600")
+        .put("reason", "Possible duplicate trade");
+    var state = new JsonObject().put("step", 0);
+
+    var result = client.decideNext(event, state).result();
+    assertEquals("data.lookup", result.getString("tool"));
+    assertFalse(result.getBoolean("stop"));
+  }
+
+  @Test
+  void duplicate_step1_triggers_classify_critical() {
+    var loader = new TradeFailureRuleLoader();
+    StubLlmClient client = loader.load().toClient();
+
+    var event = new JsonObject()
+        .put("tradeId", "T-600")
+        .put("reason", "Possible duplicate trade");
+    var state = new JsonObject().put("step", 1);
+
+    var result = client.decideNext(event, state).result();
+    assertEquals("case.classify", result.getString("tool"));
+    assertEquals("CRITICAL", result.getJsonObject("args").getString("severity"));
+    assertEquals("Operations", result.getJsonObject("args").getString("category"));
+    assertFalse(result.getBoolean("stop"));
+  }
+
+  @Test
+  void duplicate_step3_triggers_pagerduty() {
+    var loader = new TradeFailureRuleLoader();
+    StubLlmClient client = loader.load().toClient();
+
+    var event = new JsonObject()
+        .put("tradeId", "T-600")
+        .put("reason", "Possible duplicate trade");
+    var state = new JsonObject().put("step", 3);
+
+    var result = client.decideNext(event, state).result();
+    assertEquals("comms.notify", result.getString("tool"));
+    assertEquals("pagerduty", result.getJsonObject("args").getString("channel"));
+    assertTrue(result.getBoolean("stop"));
+  }
+
+  // ── Regulatory Deadline rule ──────────────────────────────────────
+
+  @Test
+  void regulatory_step0_triggers_lookup() {
+    var loader = new TradeFailureRuleLoader();
+    StubLlmClient client = loader.load().toClient();
+
+    var event = new JsonObject()
+        .put("tradeId", "T-700")
+        .put("reason", "Regulatory T+1 deadline at risk");
+    var state = new JsonObject().put("step", 0);
+
+    var result = client.decideNext(event, state).result();
+    assertEquals("data.lookup", result.getString("tool"));
+    assertFalse(result.getBoolean("stop"));
+  }
+
+  @Test
+  void regulatory_step1_triggers_classify_compliance() {
+    var loader = new TradeFailureRuleLoader();
+    StubLlmClient client = loader.load().toClient();
+
+    var event = new JsonObject()
+        .put("tradeId", "T-700")
+        .put("reason", "Regulatory T+1 deadline at risk");
+    var state = new JsonObject().put("step", 1);
+
+    var result = client.decideNext(event, state).result();
+    assertEquals("case.classify", result.getString("tool"));
+    assertEquals("CRITICAL", result.getJsonObject("args").getString("severity"));
+    assertEquals("Compliance", result.getJsonObject("args").getString("category"));
+    assertFalse(result.getBoolean("stop"));
+  }
+
+  @Test
+  void regulatory_step3_triggers_pagerduty_to_compliance() {
+    var loader = new TradeFailureRuleLoader();
+    StubLlmClient client = loader.load().toClient();
+
+    var event = new JsonObject()
+        .put("tradeId", "T-700")
+        .put("reason", "Regulatory T+1 deadline at risk");
+    var state = new JsonObject().put("step", 3);
+
+    var result = client.decideNext(event, state).result();
+    assertEquals("comms.notify", result.getString("tool"));
+    assertEquals("pagerduty", result.getJsonObject("args").getString("channel"));
+    assertEquals("Compliance", result.getJsonObject("args").getString("team"));
+    assertTrue(result.getBoolean("stop"));
   }
 }

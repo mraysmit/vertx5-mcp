@@ -56,9 +56,15 @@ handlers:
 # Supported types:
 #   publish-event  — publishes arbitrary domain events
 #   raise-ticket   — creates a support ticket
+#   lookup         — looks up reference/enrichment data (counterparty, security, settlement)
+#   classify       — classifies failure category and severity
+#   notify         — sends notifications (email, slack, pagerduty)
 tools:
   - type: "publish-event"
   - type: "raise-ticket"
+  - type: "lookup"
+  - type: "classify"
+  - type: "notify"
 
 # ── LLM client ──────────────────────────────────────────────────────────────
 # Supported types:

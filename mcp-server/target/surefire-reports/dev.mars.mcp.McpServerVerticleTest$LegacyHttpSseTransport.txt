@@ -1,4 +1,0 @@
--------------------------------------------------------------------------------
-Test set: dev.mars.mcp.McpServerVerticleTest$LegacyHttpSseTransport
--------------------------------------------------------------------------------
-Tests run: 13, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.745 s -- in dev.mars.mcp.McpServerVerticleTest$LegacyHttpSseTransport

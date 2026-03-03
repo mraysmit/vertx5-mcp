@@ -15,7 +15,7 @@
     application bootstrap.</description>
 
   <properties>
-    <main.verticle>dev.mars.agent.MainVerticle</main.verticle>
+    <main.class>dev.mars.agent.Main</main.class>
   </properties>
 
   <dependencies>
@@ -61,10 +61,7 @@
               <createDependencyReducedPom>false</createDependencyReducedPom>
               <transformers>
                 <transformer implementation="org.apache.maven.plugins.shade.resource.ManifestResourceTransformer">
-                  <mainClass>io.vertx.core.Launcher</mainClass>
-                  <manifestEntries>
-                    <Main-Verticle>${main.verticle}</Main-Verticle>
-                  </manifestEntries>
+                  <mainClass>${main.class}</mainClass>
                 </transformer>
               </transformers>
               <finalName>${project.artifactId}-${project.version}-fat</finalName>

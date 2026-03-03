@@ -58,9 +58,12 @@ class PipelineConfigLoaderTest {
   @Test
   void yaml_tools_are_parsed() {
     PipelineConfig cfg = PipelineConfigLoader.load("pipeline.yaml");
-    assertEquals(2, cfg.tools().size());
+    assertEquals(5, cfg.tools().size());
     assertEquals("publish-event", cfg.tools().get(0).type());
     assertEquals("raise-ticket", cfg.tools().get(1).type());
+    assertEquals("lookup", cfg.tools().get(2).type());
+    assertEquals("classify", cfg.tools().get(3).type());
+    assertEquals("notify", cfg.tools().get(4).type());
   }
 
   @Test

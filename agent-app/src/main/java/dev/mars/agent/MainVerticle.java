@@ -15,6 +15,8 @@ import dev.mars.agent.memory.MemoryStore;
 import dev.mars.agent.processor.DeterministicFailureProcessorVerticle;
 import dev.mars.agent.processor.FailureHandler;
 import dev.mars.agent.runner.AgentRunnerVerticle;
+import dev.mars.agent.ui.PipelineUiVerticle;
+import dev.mars.agent.ui.WorkflowUiVerticle;
 import dev.mars.mcp.tool.Tool;
 import dev.mars.mcp.tool.ToolRegistry;
 import io.vertx.core.AbstractVerticle;
@@ -187,8 +189,40 @@ public class MainVerticle extends AbstractVerticle {
         LOG.info("MCP server not enabled — skipping");
         return Future.succeededFuture(id);
       })
+      .compose(id -> {
+        LOG.info("Deploying PipelineUiVerticle on port " + childConfig.getInteger("ui.port", 8081));
+        return vertx.deployVerticle(new PipelineUiVerticle(cfg), childOpts);
+      })
+      .compose(id -> {
+        LOG.info("Deploying WorkflowUiVerticle on port " + childConfig.getInteger("workflow.port", 8082));
+        return vertx.deployVerticle(
+            new WorkflowUiVerticle(inbound, events, cfg.http().requestTimeoutMs()), childOpts);
+      })
       .onSuccess(id -> {
-        LOG.info("Pipeline deployed successfully — all verticles started");
+        int httpPort      = childConfig.getInteger("http.port", 8080);
+        int mcpPort       = childConfig.getInteger("mcp.port", 3001);
+        int uiPort        = childConfig.getInteger("ui.port", 8081);
+        int workflowPort  = childConfig.getInteger("workflow.port", 8082);
+        boolean mcpOn     = mcpCfg != null && mcpCfg.enabled();
+
+        String api    = "http://localhost:" + httpPort + cfg.http().route();
+        String health = "http://localhost:" + httpPort + "/health";
+        String mcp    = mcpOn ? "http://localhost:" + mcpPort + "/mcp" : "(disabled)";
+        String ui       = "http://localhost:" + uiPort + "/ui/";
+        String workflow = "http://localhost:" + workflowPort + "/workflow/";
+
+        int W = 56; // inner width between ║ chars
+        String banner = "\n"
+            + line('═', W) + "\n"
+            + row("vertx5-mcp — pipeline ready", W) + "\n"
+            + mid('═', W) + "\n"
+            + row("API      " + api, W) + "\n"
+            + row("Health   " + health, W) + "\n"
+            + row("MCP      " + mcp, W) + "\n"
+            + row("UI       " + ui, W) + "\n"
+            + row("Runner   " + workflow, W) + "\n"
+            + bot('═', W);
+        LOG.info(banner);
         startPromise.complete();
       })
       .onFailure(err -> {
@@ -234,5 +268,27 @@ public class MainVerticle extends AbstractVerticle {
     } catch (IOException e) {
       System.err.println("WARNING: could not load logging.properties: " + e.getMessage());
     }
+  }
+
+  /** Right-pad with spaces to align the box border. */
+  private static String padTo(int n) {
+    return n > 0 ? " ".repeat(n) : "";
+  }
+
+  private static String line(char c, int w) {
+    return "╔" + String.valueOf(c).repeat(w) + "╗";
+  }
+
+  private static String mid(char c, int w) {
+    return "╠" + String.valueOf(c).repeat(w) + "╣";
+  }
+
+  private static String bot(char c, int w) {
+    return "╚" + String.valueOf(c).repeat(w) + "╝";
+  }
+
+  private static String row(String text, int w) {
+    int pad = w - 2 - text.length(); // 2 for the leading/trailing space
+    return "║ " + text + (pad > 0 ? " ".repeat(pad) : "") + " ║";
   }
 }

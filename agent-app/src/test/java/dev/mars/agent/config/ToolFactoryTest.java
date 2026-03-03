@@ -1,5 +1,8 @@
 package dev.mars.agent.config;
 
+import dev.mars.agent.tool.ClassifyTool;
+import dev.mars.agent.tool.LookupTool;
+import dev.mars.agent.tool.NotifyTool;
 import dev.mars.agent.tool.PublishEventTool;
 import dev.mars.agent.tool.RaiseTicketTool;
 import dev.mars.mcp.tool.Tool;
@@ -25,6 +28,27 @@ class ToolFactoryTest {
     Tool tool = ToolFactory.create("raise-ticket", vertx, "events.out");
     assertInstanceOf(RaiseTicketTool.class, tool);
     assertEquals("case.raiseTicket", tool.name());
+  }
+
+  @Test
+  void creates_lookup_tool(Vertx vertx) {
+    Tool tool = ToolFactory.create("lookup", vertx, "events.out");
+    assertInstanceOf(LookupTool.class, tool);
+    assertEquals("data.lookup", tool.name());
+  }
+
+  @Test
+  void creates_classify_tool(Vertx vertx) {
+    Tool tool = ToolFactory.create("classify", vertx, "events.out");
+    assertInstanceOf(ClassifyTool.class, tool);
+    assertEquals("case.classify", tool.name());
+  }
+
+  @Test
+  void creates_notify_tool(Vertx vertx) {
+    Tool tool = ToolFactory.create("notify", vertx, "events.out");
+    assertInstanceOf(NotifyTool.class, tool);
+    assertEquals("comms.notify", tool.name());
   }
 
   @Test

@@ -1,5 +1,23 @@
-/target/
+# Build output
+**/target/
+
+# IDE
 .idea/
 *.iml
+.vscode/
+
+# OS
 .DS_Store
+Thumbs.db
+
+# Logs
+logs/
+
+# Editor history
 .history/
+
+# Maven
+dependency-reduced-pom.xml
+
+# Runtime
+META-INF/
