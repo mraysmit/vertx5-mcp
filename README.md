@@ -1,11 +1,28 @@
-# Vert.x 5.x Agent vs Workflow Sample (Java)
+# vertx5-mcp — Vert.x 5 Agent + MCP Server (Java)
 
-A **minimal, runnable Vert.x 5 sample** showing the correct hybrid pattern:
+A **multi-module Vert.x 5 project** demonstrating the hybrid deterministic-workflow / LLM-agent pattern with a built-in [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server.
 
 - **Deterministic processor** handles known failures via pluggable handlers.
 - **Agent boundary** only triggers when the failure is unknown/ambiguous.
 - The "LLM" is a **stub** that emits strict JSON commands (replace later).
 - **Tools are self-describing** with JSON Schema metadata aligned with MCP.
+- **Built-in MCP server** exposes tools via Streamable HTTP (2025-03-26) and legacy HTTP+SSE (2024-11-05) transports.
+
+## Modules
+
+| Module | ArtifactId | Purpose |
+|---|---|---|
+| `mcp-server` | `mcp-server` | Standalone MCP server verticle — Streamable HTTP + legacy SSE transports, `Tool` / `ToolRegistry` interfaces. Zero agent coupling. |
+| `agent-core` | `agent-core` | Reusable agent infrastructure — LLM interfaces, memory, agent runner, deterministic processor, config records, HTTP API verticle. |
+| `agent-app` | `agent-app` | Trade-failure domain logic — handlers, tools, factories, YAML-driven bootstrap (`MainVerticle`). Produces the fat JAR. |
+
+```
+vertx5-mcp/
+├── mcp-server/         # dev.mars.mcp
+├── agent-core/         # dev.mars.agent  (core abstractions)
+├── agent-app/          # dev.mars.agent  (domain + bootstrap)
+└── pom.xml             # parent POM (dev.mars:vertx5-agent)
+```
 
 ## Requirements
 - Java 21+
@@ -13,14 +30,13 @@ A **minimal, runnable Vert.x 5 sample** showing the correct hybrid pattern:
 
 ## Build + Run
 ```bash
-mvn -q test
-mvn -q package
-java -jar target/vertx5-mcp-0.1.0-SNAPSHOT-fat.jar
+mvn -q clean test
+mvn -q package -DskipTests
+java -jar agent-app/target/agent-app-0.1.0-SNAPSHOT-fat.jar
 ```
 
-Server starts on **http://localhost:8080** (override with config `http.port`)
-
-MCP server starts on **http://localhost:3001** (override with `mcp.port` in `pipeline.yaml`)
+- Agent HTTP API: **http://localhost:8080** (override with `http.port` in `pipeline.yaml`)
+- MCP server: **http://localhost:3001** (override with `mcp.port` in `pipeline.yaml`)
 
 ## Health Check
 ```bash
@@ -43,7 +59,31 @@ curl -s -X POST http://localhost:8080/trade/failures \
   -d '{"tradeId":"T-200","reason":"LEI not found in registry"}' | jq
 ```
 
-### 3) MCP — list available tools
+### 3) MCP — Streamable HTTP transport (2025-03-26)
+
+```bash
+# Initialize a session
+curl -s -X POST http://localhost:3001/mcp \
+  -H 'content-type: application/json' \
+  -H 'Accept: application/json' \
+  -d '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"curl","version":"1.0"}}}'
+
+# List tools (include Mcp-Session-Id from the initialize response)
+curl -s -X POST http://localhost:3001/mcp \
+  -H 'content-type: application/json' \
+  -H 'Accept: application/json' \
+  -H 'Mcp-Session-Id: <sessionId>' \
+  -d '{"jsonrpc":"2.0","id":2,"method":"tools/list"}'
+
+# Invoke a tool
+curl -s -X POST http://localhost:3001/mcp \
+  -H 'content-type: application/json' \
+  -H 'Accept: application/json' \
+  -H 'Mcp-Session-Id: <sessionId>' \
+  -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"case.raiseTicket","arguments":{"tradeId":"T-300","category":"ReferenceData","summary":"MCP test"}}}'
+```
+
+### 4) MCP — Legacy SSE transport (2024-11-05)
 ```bash
 # Open SSE connection and note the sessionId from the endpoint event
 curl -N http://localhost:3001/sse &
@@ -52,13 +92,6 @@ curl -N http://localhost:3001/sse &
 curl -s -X POST "http://localhost:3001/message?sessionId=<sessionId>" \
   -H 'content-type: application/json' \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
-```
-
-### 4) MCP — invoke a tool directly
-```bash
-curl -s -X POST "http://localhost:3001/message?sessionId=<sessionId>" \
-  -H 'content-type: application/json' \
-  -d '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"case.raiseTicket","arguments":{"tradeId":"T-300","category":"ReferenceData","summary":"MCP test"}}}'
 ```
 
 ---
@@ -92,16 +125,30 @@ externalised to `pipeline.yaml` and resolved at startup via factory classes.
 
 ## MCP Server
 
-The project includes a built-in **MCP server** (`McpServerVerticle`) that
-exposes the agent's tools via the [Model Context Protocol](https://modelcontextprotocol.io/)
-using the **HTTP + SSE transport**.
+The `mcp-server` module provides `McpServerVerticle` — a standalone MCP server
+that exposes the agent's tools via the [Model Context Protocol](https://modelcontextprotocol.io/).
 
-### Endpoints
+### Transports
 
-| Endpoint | Method | Purpose |
+| Transport | Spec Version | Endpoints |
 |---|---|---|
-| `/sse` | GET | Opens an SSE connection; server sends an `endpoint` event with the URL for posting messages |
-| `/message?sessionId=<id>` | POST | Receives JSON-RPC 2.0 requests; responses are delivered via the SSE stream |
+| **Streamable HTTP** | 2025-03-26 | `POST /mcp`, `GET /mcp`, `DELETE /mcp` |
+| **Legacy HTTP+SSE** | 2024-11-05 | `GET /sse`, `POST /message?sessionId=<id>` |
+
+### Streamable HTTP (2025-03-26)
+
+The primary transport. A single `/mcp` endpoint handles all interactions:
+- **POST** — JSON-RPC requests/notifications. Responds with `application/json` or `text/event-stream` based on the client's `Accept` header. Supports JSON-RPC batch requests.
+- **GET** — Opens an SSE stream for server-initiated messages.
+- **DELETE** — Terminates the session.
+
+Session management uses the `Mcp-Session-Id` header — assigned after `initialize`, required on all subsequent requests.
+
+### Legacy HTTP+SSE (2024-11-05)
+
+Backwards-compatible transport for older MCP clients:
+- **GET `/sse`** — Opens an SSE connection; server sends an `endpoint` event with the URL for posting messages.
+- **POST `/message?sessionId=<id>`** — Receives JSON-RPC requests; responses are delivered via the SSE stream.
 
 ### Supported JSON-RPC Methods
 
@@ -139,26 +186,26 @@ Add this to your Claude Desktop MCP settings:
 
 ## How This Demonstrates MCP
 
-This project implements MCP directly — the `McpServerVerticle` exposes
-tools via the standard MCP HTTP+SSE transport with JSON-RPC 2.0. The
-core abstractions map onto MCP concepts:
+This project implements MCP directly — `McpServerVerticle` exposes tools via
+standard MCP transports with JSON-RPC 2.0. The core abstractions map onto MCP
+concepts:
 
 ### MCP Concept Mapping
 
 | MCP Concept | This Project | Where |
 |---|---|---|
-| **Tool** — a callable capability with a name, description, and input schema | `Tool` interface with `name()`, `description()`, `schema()` | `tool/Tool.java` |
-| **`tools/list`** — server advertises available tools with their schemas | `ToolRegistry` holds all registered tools; each tool self-describes via `schema()` | `tool/ToolRegistry.java`, `mcp/McpServerVerticle.java` |
-| **`tools/call`** — client invokes a tool by name with JSON arguments | `AgentRunnerVerticle.executeCommand()` and `McpServerVerticle.handleToolsCall()` dispatch `{tool, args}` to the matching `Tool` | `runner/AgentRunnerVerticle.java`, `mcp/McpServerVerticle.java` |
-| **`inputSchema`** — JSON Schema describing a tool's parameters | `Tool.schema()` returns JSON Schema 2020-12 compatible `JsonObject` | `tool/Tool.java` |
-| **Tool allow-listing** — security boundary controlling which tools an agent can use | `ToolRegistry` acts as the allow-list; unknown tools are rejected with "not allowlisted" | `runner/AgentRunnerVerticle.java` |
-| **LLM function-calling** — LLM decides which tool to call and with what arguments | `LlmClient.decideNext()` returns `{intent: "CALL_TOOL", tool, args}` commands | `llm/LlmClient.java` |
-| **Agent loop** — iterative tool calls until the task is complete | `AgentRunnerVerticle.runLoop()` loops until `stop: true` or step limit | `runner/AgentRunnerVerticle.java` |
+| **Tool** — a callable capability with a name, description, and input schema | `Tool` interface with `name()`, `description()`, `schema()` | `mcp-server` — `tool/Tool.java` |
+| **`tools/list`** — server advertises available tools with their schemas | `ToolRegistry` holds all registered tools; each tool self-describes via `schema()` | `mcp-server` — `tool/ToolRegistry.java` |
+| **`tools/call`** — client invokes a tool by name with JSON arguments | `McpServerVerticle` dispatches `{tool, args}` to the matching `Tool` | `mcp-server` — `McpServerVerticle.java` |
+| **`inputSchema`** — JSON Schema describing a tool's parameters | `Tool.schema()` returns JSON Schema 2020-12 compatible `JsonObject` | `mcp-server` — `tool/Tool.java` |
+| **Tool allow-listing** — security boundary controlling which tools an agent can use | `ToolRegistry` acts as the allow-list; unknown tools are rejected | `mcp-server` — `tool/ToolRegistry.java` |
+| **LLM function-calling** — LLM decides which tool to call and with what arguments | `LlmClient.decideNext()` returns `{intent, tool, args}` commands | `agent-core` — `llm/LlmClient.java` |
+| **Agent loop** — iterative tool calls until the task is complete | `AgentRunnerVerticle.runLoop()` loops until `stop: true` or step limit | `agent-core` — `runner/AgentRunnerVerticle.java` |
 
 ### What Each Tool Exposes (MCP-Ready)
 
 Every `Tool` implementation provides three pieces of metadata that an MCP
-server would advertise in a `tools/list` response:
+server advertises in a `tools/list` response:
 
 ```java
 public interface Tool {
@@ -215,8 +262,6 @@ command format that mirrors MCP's `tools/call` request:
 
 ### What's Remaining for Full MCP
 
-The MCP server covers tools. To complete the full MCP surface:
-
 | Gap | What's Needed |
 |---|---|
 | **Resources** | MCP resources for exposing contextual data (e.g. trade details) |
@@ -236,7 +281,7 @@ with MCP-compatible function-calling requires no changes to the tool layer.
    tools transparently.
 
 2. ~~**Expose tools as an MCP server**~~ — ✅ Done. `McpServerVerticle`
-   serves `tools/list` and `tools/call` over HTTP+SSE.
+   serves `tools/list` and `tools/call` over Streamable HTTP and legacy SSE.
 
 3. **Replace `StubLlmClient`** — use `OpenAiLlmClient` (placeholder in
    `llm/OpenAiLlmClient.java`) with function-calling, passing tool schemas
@@ -246,23 +291,26 @@ with MCP-compatible function-calling requires no changes to the tool layer.
 
 ## What to Look At
 
-| Component | Purpose |
-|---|---|
-| `DeterministicFailureProcessorVerticle` | Normal service — fast, predictable, strategy-pattern handlers |
-| `AgentRunnerVerticle` | Step-limited agent runner + tool dispatch (MCP client pattern) |
-| `McpServerVerticle` | MCP server — exposes tools via HTTP+SSE transport |
-| `Tool` interface | Self-describing tools with `name()`, `description()`, `schema()` |
-| `StubLlmClient` | Rule-based stub returning strict JSON commands |
-| `pipeline.yaml` | All configuration externalised — addresses, handlers, tools, LLM |
-| `config/` package | Records, loader, and factory classes for YAML-driven wiring |
+| Component | Module | Purpose |
+|---|---|---|
+| `McpServerVerticle` | `mcp-server` | MCP server — Streamable HTTP + legacy SSE transports |
+| `Tool` interface | `mcp-server` | Self-describing tools with `name()`, `description()`, `schema()` |
+| `ToolRegistry` | `mcp-server` | Tool registration and allow-listing |
+| `DeterministicFailureProcessorVerticle` | `agent-core` | Normal service — fast, predictable, strategy-pattern handlers |
+| `AgentRunnerVerticle` | `agent-core` | Step-limited agent runner + tool dispatch (MCP client pattern) |
+| `HttpApiVerticle` | `agent-core` | HTTP ingress with schema validation |
+| `StubLlmClient` | `agent-core` | Rule-based stub returning strict JSON commands |
+| `MainVerticle` | `agent-app` | Application bootstrap — deploys all verticles from YAML config |
+| `pipeline.yaml` | `agent-app` | All configuration externalised — addresses, handlers, tools, LLM, MCP |
+| `config/` package | `agent-app` | Factory classes for YAML-driven wiring |
 
 ## Configuration
 
-All pipeline wiring is in `src/main/resources/pipeline.yaml`. Override the
+All pipeline wiring is in `agent-app/src/main/resources/pipeline.yaml`. Override the
 config file path at startup:
 
 ```bash
-java -Dpipeline.config=my-config.yaml -jar app.jar
+java -Dpipeline.config=my-config.yaml -jar agent-app/target/agent-app-0.1.0-SNAPSHOT-fat.jar
 ```
 
 See `PipelineConfigLoader` for loading details and `MainVerticle` for how
@@ -270,22 +318,34 @@ factories resolve YAML aliases to concrete classes.
 
 ## Test Coverage
 
-120 tests across 24 test classes covering:
-- Config record validation and defensive copying
+24 test classes across all three modules covering:
+
+**mcp-server**
+- `ToolRegistry` immutability, lookup, and registration
+- `McpServerVerticle` — Streamable HTTP transport, legacy SSE transport, JSON-RPC dispatch, session management, batch requests, tool invocation, and error handling
+
+**agent-core**
+- Config record validation and defensive copying (`HttpConfig`, `McpConfig`, `LlmConfig`, `HandlerConfig`, `SchemaConfig`)
+- `StubLlmClient` rule matching, fallback, and defensive copying
+- `OpenAiLlmClient` placeholder
+- `InMemoryMemoryStore` lifecycle and case isolation
+- `DeterministicFailureProcessorVerticle` routing and handler dispatch
+- `AgentRunnerVerticle` step limits, tool dispatch, and error paths
+- `HttpApiVerticle` routing and request validation
+- `EventSinkVerticle` event bus publishing
+
+**agent-app**
 - Factory resolution (handlers, tools, LLM clients) with error cases
 - YAML config parsing and missing-resource handling
-- Handler behaviour and event bus publishing
-- Tool invocation, schema metadata, and registry immutability
-- StubLlmClient rule matching, fallback, and defensive copying
-- InMemoryMemoryStore lifecycle and case isolation
-- Verticle deployment, routing, step limits, and error paths
-- MCP server SSE transport, JSON-RPC dispatch, tool invocation, and error handling
+- Handler behaviour (`LookupEnrichHandler`, `EscalateHandler`)
+- Tool invocation and schema metadata (`RaiseTicketTool`, `PublishEventTool`)
+- `TradeFailureRuleLoader` rule loading
 - End-to-end smoke tests (deterministic + agent paths)
 
 ## Logging
 
 The application uses `java.util.logging` (JUL) configured via
-`src/main/resources/logging.properties`, loaded by `MainVerticle` at
+`agent-app/src/main/resources/logging.properties`, loaded by `MainVerticle` at
 startup.
 
 | Setting | Value |
@@ -300,5 +360,5 @@ Log files are written to the `logs/` directory (created automatically).
 Override at runtime with a system property:
 
 ```bash
-java -Djava.util.logging.config.file=my-logging.properties -jar target/vertx5-mcp-0.1.0-SNAPSHOT.jar
+java -Djava.util.logging.config.file=my-logging.properties -jar agent-app/target/agent-app-0.1.0-SNAPSHOT-fat.jar
 ```

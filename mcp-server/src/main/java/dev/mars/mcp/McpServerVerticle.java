@@ -94,7 +94,7 @@ public class McpServerVerticle extends AbstractVerticle {
   static final String PROTOCOL_VERSION = "2025-03-26";
   /** Legacy protocol version for backwards compatibility. */
   static final String LEGACY_PROTOCOL_VERSION = "2024-11-05";
-  static final String SERVER_NAME = "vertx5-agent-sample";
+  static final String SERVER_NAME = "vertx5-mcp";
   static final String SERVER_VERSION = "0.2.0";
 
   /** Header name for MCP session ID (2025-03-26 spec). */
