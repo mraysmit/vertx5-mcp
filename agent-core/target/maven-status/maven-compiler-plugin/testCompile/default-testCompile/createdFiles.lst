@@ -1,0 +1,13 @@
+dev\mars\agent\api\HttpApiVerticleTest.class
+dev\mars\agent\config\SchemaConfigTest.class
+dev\mars\agent\config\HandlerConfigTest.class
+dev\mars\agent\memory\InMemoryMemoryStoreTest.class
+dev\mars\agent\llm\StubLlmClientTest.class
+dev\mars\agent\config\McpConfigTest.class
+dev\mars\agent\llm\OpenAiLlmClientTest.class
+dev\mars\agent\processor\DeterministicFailureProcessorVerticleTest.class
+dev\mars\agent\event\EventSinkVerticleTest.class
+dev\mars\agent\config\LlmConfigTest.class
+dev\mars\agent\runner\AgentRunnerVerticleTest.class
+dev\mars\agent\runner\AgentRunnerVerticleTest$1.class
+dev\mars\agent\config\HttpConfigTest.class

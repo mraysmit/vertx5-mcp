@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="https://maven.apache.org/surefire/maven-surefire-plugin/xsd/surefire-test-report-3.0.xsd" version="3.0" name="dev.mars.agent.config.HandlerFactoryTest" time="0.434" tests="5" errors="0" skipped="0" failures="0">
+  <properties>
+    <property name="java.specification.version" value="25"/>
+    <property name="sun.cpu.isalist" value="amd64"/>
+    <property name="sun.jnu.encoding" value="Cp1252"/>
+    <property name="java.class.path" value="C:\Users\markr\dev\java\corejava\vertx5-agent-sample\agent-app\target\test-classes;C:\Users\markr\dev\java\corejava\vertx5-agent-sample\agent-app\target\classes;C:\Users\markr\dev\java\corejava\vertx5-agent-sample\agent-core\target\classes;C:\Users\markr\dev\java\corejava\vertx5-agent-sample\mcp-server\target\classes;C:\Users\markr\.m2\repository\com\fasterxml\jackson\core\jackson-databind\2.17.0\jackson-databind-2.17.0.jar;C:\Users\markr\.m2\repository\com\fasterxml\jackson\core\jackson-annotations\2.18.2\jackson-annotations-2.18.2.jar;C:\Users\markr\.m2\repository\net\bytebuddy\byte-buddy\1.14.9\byte-buddy-1.14.9.jar;C:\Users\markr\.m2\repository\com\fasterxml\jackson\dataformat\jackson-dataformat-yaml\2.17.0\jackson-dataformat-yaml-2.17.0.jar;C:\Users\markr\.m2\repository\org\yaml\snakeyaml\2.0\snakeyaml-2.0.jar;C:\Users\markr\.m2\repository\io\vertx\vertx-core\5.0.8\vertx-core-5.0.8.jar;C:\Users\markr\.m2\repository\io\vertx\vertx-core-logging\5.0.8\vertx-core-logging-5.0.8.jar;C:\Users\markr\.m2\repository\io\netty\netty-common\4.2.10.Final\netty-common-4.2.10.Final.jar;C:\Users\markr\.m2\repository\io\netty\netty-buffer\4.2.10.Final\netty-buffer-4.2.10.Final.jar;C:\Users\markr\.m2\repository\io\netty\netty-transport\4.2.10.Final\netty-transport-4.2.10.Final.jar;C:\Users\markr\.m2\repository\io\netty\netty-handler\4.2.10.Final\netty-handler-4.2.10.Final.jar;C:\Users\markr\.m2\repository\io\netty\netty-transport-native-unix-common\4.2.10.Final\netty-transport-native-unix-common-4.2.10.Final.jar;C:\Users\markr\.m2\repository\io\netty\netty-codec-base\4.2.10.Final\netty-codec-base-4.2.10.Final.jar;C:\Users\markr\.m2\repository\io\netty\netty-handler-proxy\4.2.10.Final\netty-handler-proxy-4.2.10.Final.jar;C:\Users\markr\.m2\repository\io\netty\netty-codec-socks\4.2.10.Final\netty-codec-socks-4.2.10.Final.jar;C:\Users\markr\.m2\repository\io\netty\netty-codec-http\4.2.10.Final\netty-codec-http-4.2.10.Final.jar;C:\Users\markr\.m2\repository\io\netty\netty-codec-compression\4.2.10.Final\netty-codec-compression-4.2.10.Final.jar;C:\Users\markr\.m2\repository\io\netty\netty-codec-http2\4.2.10.Final\netty-codec-http2-4.2.10.Final.jar;C:\Users\markr\.m2\repository\io\netty\netty-resolver\4.2.10.Final\netty-resolver-4.2.10.Final.jar;C:\Users\markr\.m2\repository\io\netty\netty-resolver-dns\4.2.10.Final\netty-resolver-dns-4.2.10.Final.jar;C:\Users\markr\.m2\repository\io\netty\netty-codec-dns\4.2.10.Final\netty-codec-dns-4.2.10.Final.jar;C:\Users\markr\.m2\repository\com\fasterxml\jackson\core\jackson-core\2.18.2\jackson-core-2.18.2.jar;C:\Users\markr\.m2\repository\io\vertx\vertx-web\5.0.8\vertx-web-5.0.8.jar;C:\Users\markr\.m2\repository\io\vertx\vertx-web-common\5.0.8\vertx-web-common-5.0.8.jar;C:\Users\markr\.m2\repository\io\vertx\vertx-auth-common\5.0.8\vertx-auth-common-5.0.8.jar;C:\Users\markr\.m2\repository\io\vertx\vertx-bridge-common\5.0.8\vertx-bridge-common-5.0.8.jar;C:\Users\markr\.m2\repository\io\vertx\vertx-junit5\5.0.8\vertx-junit5-5.0.8.jar;C:\Users\markr\.m2\repository\org\junit\jupiter\junit-jupiter-api\5.9.3\junit-jupiter-api-5.9.3.jar;C:\Users\markr\.m2\repository\org\opentest4j\opentest4j\1.2.0\opentest4j-1.2.0.jar;C:\Users\markr\.m2\repository\org\junit\platform\junit-platform-commons\1.9.3\junit-platform-commons-1.9.3.jar;C:\Users\markr\.m2\repository\org\apiguardian\apiguardian-api\1.1.2\apiguardian-api-1.1.2.jar;C:\Users\markr\.m2\repository\org\junit\jupiter\junit-jupiter-params\5.9.3\junit-jupiter-params-5.9.3.jar;C:\Users\markr\.m2\repository\org\junit\jupiter\junit-jupiter-engine\5.9.3\junit-jupiter-engine-5.9.3.jar;C:\Users\markr\.m2\repository\org\junit\platform\junit-platform-engine\1.9.3\junit-platform-engine-1.9.3.jar;C:\Users\markr\.m2\repository\org\junit\jupiter\junit-jupiter\5.10.2\junit-jupiter-5.10.2.jar;"/>
+    <property name="java.vm.vendor" value="Oracle Corporation"/>
+    <property name="sun.arch.data.model" value="64"/>
+    <property name="user.variant" value=""/>
+    <property name="java.vendor.url" value="https://java.oracle.com/"/>
+    <property name="user.timezone" value="Asia/Shanghai"/>
+    <property name="os.name" value="Windows 11"/>
+    <property name="java.vm.specification.version" value="25"/>
+    <property name="sun.java.launcher" value="SUN_STANDARD"/>
+    <property name="user.country" value="GB"/>
+    <property name="sun.boot.library.path" value="C:\Users\markr\.jdks\openjdk-25\bin"/>
+    <property name="sun.java.command" value="C:\Users\markr\AppData\Local\Temp\surefire5070290505645656332\surefirebooter-20260303120437648_57.jar C:\Users\markr\AppData\Local\Temp\surefire5070290505645656332 2026-03-03T12-04-31_232-jvmRun1 surefire-20260303120437648_55tmp surefire_2-20260303120437648_56tmp"/>
+    <property name="jdk.debug" value="release"/>
+    <property name="surefire.test.class.path" value="C:\Users\markr\dev\java\corejava\vertx5-agent-sample\agent-app\target\test-classes;C:\Users\markr\dev\java\corejava\vertx5-agent-sample\agent-app\target\classes;C:\Users\markr\dev\java\corejava\vertx5-agent-sample\agent-core\target\classes;C:\Users\markr\dev\java\corejava\vertx5-agent-sample\mcp-server\target\classes;C:\Users\markr\.m2\repository\com\fasterxml\jackson\core\jackson-databind\2.17.0\jackson-databind-2.17.0.jar;C:\Users\markr\.m2\repository\com\fasterxml\jackson\core\jackson-annotations\2.18.2\jackson-annotations-2.18.2.jar;C:\Users\markr\.m2\repository\net\bytebuddy\byte-buddy\1.14.9\byte-buddy-1.14.9.jar;C:\Users\markr\.m2\repository\com\fasterxml\jackson\dataformat\jackson-dataformat-yaml\2.17.0\jackson-dataformat-yaml-2.17.0.jar;C:\Users\markr\.m2\repository\org\yaml\snakeyaml\2.0\snakeyaml-2.0.jar;C:\Users\markr\.m2\repository\io\vertx\vertx-core\5.0.8\vertx-core-5.0.8.jar;C:\Users\markr\.m2\repository\io\vertx\vertx-core-logging\5.0.8\vertx-core-logging-5.0.8.jar;C:\Users\markr\.m2\repository\io\netty\netty-common\4.2.10.Final\netty-common-4.2.10.Final.jar;C:\Users\markr\.m2\repository\io\netty\netty-buffer\4.2.10.Final\netty-buffer-4.2.10.Final.jar;C:\Users\markr\.m2\repository\io\netty\netty-transport\4.2.10.Final\netty-transport-4.2.10.Final.jar;C:\Users\markr\.m2\repository\io\netty\netty-handler\4.2.10.Final\netty-handler-4.2.10.Final.jar;C:\Users\markr\.m2\repository\io\netty\netty-transport-native-unix-common\4.2.10.Final\netty-transport-native-unix-common-4.2.10.Final.jar;C:\Users\markr\.m2\repository\io\netty\netty-codec-base\4.2.10.Final\netty-codec-base-4.2.10.Final.jar;C:\Users\markr\.m2\repository\io\netty\netty-handler-proxy\4.2.10.Final\netty-handler-proxy-4.2.10.Final.jar;C:\Users\markr\.m2\repository\io\netty\netty-codec-socks\4.2.10.Final\netty-codec-socks-4.2.10.Final.jar;C:\Users\markr\.m2\repository\io\netty\netty-codec-http\4.2.10.Final\netty-codec-http-4.2.10.Final.jar;C:\Users\markr\.m2\repository\io\netty\netty-codec-compression\4.2.10.Final\netty-codec-compression-4.2.10.Final.jar;C:\Users\markr\.m2\repository\io\netty\netty-codec-http2\4.2.10.Final\netty-codec-http2-4.2.10.Final.jar;C:\Users\markr\.m2\repository\io\netty\netty-resolver\4.2.10.Final\netty-resolver-4.2.10.Final.jar;C:\Users\markr\.m2\repository\io\netty\netty-resolver-dns\4.2.10.Final\netty-resolver-dns-4.2.10.Final.jar;C:\Users\markr\.m2\repository\io\netty\netty-codec-dns\4.2.10.Final\netty-codec-dns-4.2.10.Final.jar;C:\Users\markr\.m2\repository\com\fasterxml\jackson\core\jackson-core\2.18.2\jackson-core-2.18.2.jar;C:\Users\markr\.m2\repository\io\vertx\vertx-web\5.0.8\vertx-web-5.0.8.jar;C:\Users\markr\.m2\repository\io\vertx\vertx-web-common\5.0.8\vertx-web-common-5.0.8.jar;C:\Users\markr\.m2\repository\io\vertx\vertx-auth-common\5.0.8\vertx-auth-common-5.0.8.jar;C:\Users\markr\.m2\repository\io\vertx\vertx-bridge-common\5.0.8\vertx-bridge-common-5.0.8.jar;C:\Users\markr\.m2\repository\io\vertx\vertx-junit5\5.0.8\vertx-junit5-5.0.8.jar;C:\Users\markr\.m2\repository\org\junit\jupiter\junit-jupiter-api\5.9.3\junit-jupiter-api-5.9.3.jar;C:\Users\markr\.m2\repository\org\opentest4j\opentest4j\1.2.0\opentest4j-1.2.0.jar;C:\Users\markr\.m2\repository\org\junit\platform\junit-platform-commons\1.9.3\junit-platform-commons-1.9.3.jar;C:\Users\markr\.m2\repository\org\apiguardian\apiguardian-api\1.1.2\apiguardian-api-1.1.2.jar;C:\Users\markr\.m2\repository\org\junit\jupiter\junit-jupiter-params\5.9.3\junit-jupiter-params-5.9.3.jar;C:\Users\markr\.m2\repository\org\junit\jupiter\junit-jupiter-engine\5.9.3\junit-jupiter-engine-5.9.3.jar;C:\Users\markr\.m2\repository\org\junit\platform\junit-platform-engine\1.9.3\junit-platform-engine-1.9.3.jar;C:\Users\markr\.m2\repository\org\junit\jupiter\junit-jupiter\5.10.2\junit-jupiter-5.10.2.jar;"/>
+    <property name="sun.cpu.endian" value="little"/>
+    <property name="user.home" value="C:\Users\markr"/>
+    <property name="user.language" value="en"/>
+    <property name="java.specification.vendor" value="Oracle Corporation"/>
+    <property name="java.version.date" value="2025-09-16"/>
+    <property name="java.home" value="C:\Users\markr\.jdks\openjdk-25"/>
+    <property name="file.separator" value="\"/>
+    <property name="basedir" value="C:\Users\markr\dev\java\corejava\vertx5-agent-sample\agent-app"/>
+    <property name="java.vm.compressedOopsMode" value="Zero based"/>
+    <property name="line.separator" value="&#10;"/>
+    <property name="java.vm.specification.vendor" value="Oracle Corporation"/>
+    <property name="java.specification.name" value="Java Platform API Specification"/>
+    <property name="surefire.real.class.path" value="C:\Users\markr\AppData\Local\Temp\surefire5070290505645656332\surefirebooter-20260303120437648_57.jar"/>
+    <property name="user.script" value=""/>
+    <property name="sun.management.compiler" value="HotSpot 64-Bit Tiered Compilers"/>
+    <property name="java.runtime.version" value="25+36-3489"/>
+    <property name="user.name" value="markr"/>
+    <property name="stdout.encoding" value="Cp1252"/>
+    <property name="path.separator" value=";"/>
+    <property name="os.version" value="10.0"/>
+    <property name="java.runtime.name" value="OpenJDK Runtime Environment"/>
+    <property name="file.encoding" value="UTF-8"/>
+    <property name="java.vm.name" value="OpenJDK 64-Bit Server VM"/>
+    <property name="localRepository" value="C:\Users\markr\.m2\repository"/>
+    <property name="java.vendor.url.bug" value="https://bugreport.java.com/bugreport/"/>
+    <property name="java.io.tmpdir" value="C:\Users\markr\AppData\Local\Temp\"/>
+    <property name="java.version" value="25"/>
+    <property name="user.dir" value="C:\Users\markr\dev\java\corejava\vertx5-agent-sample\agent-app"/>
+    <property name="os.arch" value="amd64"/>
+    <property name="java.vm.specification.name" value="Java Virtual Machine Specification"/>
+    <property name="sun.os.patch.level" value=""/>
+    <property name="native.encoding" value="Cp1252"/>
+    <property name="java.library.path" value="C:\Users\markr\.jdks\openjdk-25\bin;C:\WINDOWS\Sun\Java\bin;C:\WINDOWS\system32;C:\WINDOWS;C:\Users\markr\.jdks\openjdk-25\bin;C:\Users\markr\.jdks\openjdk-25\bin;C:\Users\markr\.jdks\openjdk-24\bin;C:\Users\markr\.jdks\openjdk-24\bin;C:\Program Files\PowerShell\7;C:\Program Files (x86)\VMware\VMware Workstation\bin\;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0\;C:\Windows\System32\OpenSSH\;C:\Program Files\Microsoft SQL Server\Client SDK\ODBC\170\Tools\Binn\;C:\Users\markr\.jdks\corretto-23.0.0\bin;C:\Program Files\Azure Data Studio\bin;C:\Program Files\Microsoft SQL Server\150\Tools\Binn\;C:\Program Files\dotnet\;C:\Programs\mingw64\bin;C:\Program Files (x86)\Windows Kits\10\Windows Performance Toolkit\;C:\Program Files\Git\cmd;C:\Program Files\Docker\Docker\resources\bin;C:\Program Files (x86)\AOMEI\AOMEI Backupper\7.4.2;C:\Users\markr\scoop\apps\maven\current\bin;;C:\ProgramData\chocolatey\bin;C:\Program Files\PowerShell\7\;C:\Users\markr\scoop\apps\maven\current\bin;C:\Users\markr\scoop\apps\nodejs-lts\current\bin;C:\Users\markr\scoop\apps\nodejs-lts\current;C:\Users\markr\AppData\Local\Programs\Python\Python312\Scripts\;C:\Users\markr\AppData\Local\Programs\Python\Python312\;C:\Users\markr\.cargo\bin;C:\Users\markr\scoop\shims;C:\Users\markr\AppData\Local\Microsoft\WindowsApps;C:\Users\markr\AppData\Local\JetBrains\Toolbox\scripts;C:\Users\markr\.dotnet\tools;C:\Users\markr\AppData\Local\Programs\Microsoft VS Code\bin;C:\Users\markr\AppData\Local\Programs\Azure Data Studio\bin;C:\Users\markr\.dotnet\tools;C:\Program Files\Azure Data Studio\bin;C:\Users\markr\.dotnet\tools;C:\Users\markr\.dotnet\tools;C:\Users\markr\AppData\Local\GitHubDesktop\bin;."/>
+    <property name="java.vm.info" value="mixed mode, sharing"/>
+    <property name="stderr.encoding" value="Cp1252"/>
+    <property name="java.vendor" value="Oracle Corporation"/>
+    <property name="java.vm.version" value="25+36-3489"/>
+    <property name="stdin.encoding" value="Cp1252"/>
+    <property name="sun.io.unicode.encoding" value="UnicodeLittle"/>
+    <property name="java.class.version" value="69.0"/>
+  </properties>
+  <testcase name="creates_lookup_enrich_handler(Vertx)" classname="dev.mars.agent.config.HandlerFactoryTest" time="0.284">
+    <system-err><![CDATA[Mar 03, 2026 12:04:38 PM dev.mars.agent.config.HandlerFactory create
+INFO: Creating handler: type=lookup-enrich params={identifier=ISIN}
+Mar 03, 2026 12:04:38 PM dev.mars.agent.config.HandlerFactory create
+INFO: Created LookupEnrichHandler for identifier='ISIN'
+]]></system-err>
+  </testcase>
+  <testcase name="unknown_type_throws(Vertx)" classname="dev.mars.agent.config.HandlerFactoryTest" time="0.051">
+    <system-err><![CDATA[Mar 03, 2026 12:04:38 PM dev.mars.agent.config.HandlerFactory create
+INFO: Creating handler: type=nonexistent params={}
+Mar 03, 2026 12:04:38 PM dev.mars.agent.config.HandlerFactory create
+SEVERE: Unknown handler type: nonexistent
+]]></system-err>
+  </testcase>
+  <testcase name="lookup_enrich_rejects_blank_identifier(Vertx)" classname="dev.mars.agent.config.HandlerFactoryTest" time="0.032">
+    <system-err><![CDATA[Mar 03, 2026 12:04:38 PM dev.mars.agent.config.HandlerFactory create
+INFO: Creating handler: type=lookup-enrich params={identifier=  }
+Mar 03, 2026 12:04:38 PM dev.mars.agent.config.HandlerFactory create
+SEVERE: Handler type 'lookup-enrich' missing required param 'identifier'
+]]></system-err>
+  </testcase>
+  <testcase name="lookup_enrich_requires_identifier_param(Vertx)" classname="dev.mars.agent.config.HandlerFactoryTest" time="0.023">
+    <system-err><![CDATA[Mar 03, 2026 12:04:38 PM dev.mars.agent.config.HandlerFactory create
+INFO: Creating handler: type=lookup-enrich params={}
+Mar 03, 2026 12:04:38 PM dev.mars.agent.config.HandlerFactory create
+SEVERE: Handler type 'lookup-enrich' missing required param 'identifier'
+]]></system-err>
+  </testcase>
+  <testcase name="creates_escalate_handler(Vertx)" classname="dev.mars.agent.config.HandlerFactoryTest" time="0.026">
+    <system-err><![CDATA[Mar 03, 2026 12:04:38 PM dev.mars.agent.config.HandlerFactory create
+INFO: Creating handler: type=escalate params={}
+Mar 03, 2026 12:04:38 PM dev.mars.agent.config.HandlerFactory create
+INFO: Created EscalateHandler
+]]></system-err>
+  </testcase>
+</testsuite>

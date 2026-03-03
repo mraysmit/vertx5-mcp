@@ -1,0 +1,12 @@
+C:\Users\markr\dev\java\corejava\vertx5-agent-sample\agent-core\src\test\java\dev\mars\agent\api\HttpApiVerticleTest.java
+C:\Users\markr\dev\java\corejava\vertx5-agent-sample\agent-core\src\test\java\dev\mars\agent\config\HandlerConfigTest.java
+C:\Users\markr\dev\java\corejava\vertx5-agent-sample\agent-core\src\test\java\dev\mars\agent\config\HttpConfigTest.java
+C:\Users\markr\dev\java\corejava\vertx5-agent-sample\agent-core\src\test\java\dev\mars\agent\config\LlmConfigTest.java
+C:\Users\markr\dev\java\corejava\vertx5-agent-sample\agent-core\src\test\java\dev\mars\agent\config\McpConfigTest.java
+C:\Users\markr\dev\java\corejava\vertx5-agent-sample\agent-core\src\test\java\dev\mars\agent\config\SchemaConfigTest.java
+C:\Users\markr\dev\java\corejava\vertx5-agent-sample\agent-core\src\test\java\dev\mars\agent\event\EventSinkVerticleTest.java
+C:\Users\markr\dev\java\corejava\vertx5-agent-sample\agent-core\src\test\java\dev\mars\agent\llm\OpenAiLlmClientTest.java
+C:\Users\markr\dev\java\corejava\vertx5-agent-sample\agent-core\src\test\java\dev\mars\agent\llm\StubLlmClientTest.java
+C:\Users\markr\dev\java\corejava\vertx5-agent-sample\agent-core\src\test\java\dev\mars\agent\memory\InMemoryMemoryStoreTest.java
+C:\Users\markr\dev\java\corejava\vertx5-agent-sample\agent-core\src\test\java\dev\mars\agent\processor\DeterministicFailureProcessorVerticleTest.java
+C:\Users\markr\dev\java\corejava\vertx5-agent-sample\agent-core\src\test\java\dev\mars\agent\runner\AgentRunnerVerticleTest.java
