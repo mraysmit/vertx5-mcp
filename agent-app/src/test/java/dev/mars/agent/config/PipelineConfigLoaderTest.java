@@ -36,7 +36,7 @@ class PipelineConfigLoaderTest {
   @Test
   void yaml_agent_section_is_parsed() {
     PipelineConfig cfg = PipelineConfigLoader.load("pipeline.yaml");
-    assertEquals(5, cfg.agent().maxSteps());
+    assertEquals(8, cfg.agent().maxSteps());
     assertEquals(10_000, cfg.agent().timeoutMs());
   }
 

@@ -157,4 +157,131 @@ class LookupToolTest {
     assertEquals("UNMATCHED", data.getJsonObject("settlement").getString("status"));
     assertEquals("2026-03-05", data.getJsonObject("settlement").getString("valueDate"));
   }
+
+  // ── Sanctions screening data tests ────────────────────────────────
+
+  @Test
+  void invoke_t800_returns_sanctions_screening_data() {
+    var tool = new LookupTool();
+    var args = new JsonObject().put("tradeId", "T-800");
+
+    var result = tool.invoke(args, testCtx()).result();
+    var data = result.getJsonObject("data");
+
+    // Counterparty should be UAE entity
+    var counterparty = data.getJsonObject("counterparty");
+    assertEquals("Meridian Trading FZE", counterparty.getString("name"));
+    assertEquals("UAE", counterparty.getString("jurisdiction"));
+
+    // Screening data should be present
+    var screening = data.getJsonObject("screening");
+    assertNotNull(screening);
+    assertEquals("FLAGGED", screening.getString("status"));
+    assertEquals("FUZZY_NAME", screening.getString("matchType"));
+    assertEquals(0.78, screening.getDouble("matchScore"));
+    assertEquals("OFAC SDN List", screening.getString("watchlist"));
+
+    // Settlement should be on screening hold
+    assertEquals("SCREENING_HOLD", data.getJsonObject("settlement").getString("status"));
+  }
+
+  @Test
+  void invoke_t800_screening_includes_analysis_context() {
+    var tool = new LookupTool();
+    var args = new JsonObject()
+        .put("tradeId", "T-800")
+        .put("fields", new JsonArray().add("screening"));
+
+    var result = tool.invoke(args, testCtx()).result();
+    var screening = result.getJsonObject("data").getJsonObject("screening");
+
+    // Additional context for LLM analysis
+    var context = screening.getJsonObject("additionalContext");
+    assertNotNull(context);
+    assertFalse(context.getBoolean("jurisdictionMatch"));
+    assertFalse(context.getBoolean("sectorMatch"));
+    assertEquals(0, context.getInteger("historicalFlags"));
+    assertEquals(7, context.getInteger("yearsAsClient"));
+  }
+
+  // ── Multi-leg cascade data tests ──────────────────────────────────
+
+  @Test
+  void invoke_t900_returns_trade_structure_data() {
+    var tool = new LookupTool();
+    var args = new JsonObject().put("tradeId", "T-900");
+
+    var result = tool.invoke(args, testCtx()).result();
+    var data = result.getJsonObject("data");
+
+    // Trade structure should be present
+    var structure = data.getJsonObject("tradeStructure");
+    assertNotNull(structure);
+    assertEquals("Interest Rate Swap", structure.getString("type"));
+    assertEquals(50_000_000, structure.getInteger("notional"));
+
+    // Pay leg should show failure
+    var payLeg = structure.getJsonObject("payLeg");
+    assertEquals("FAILED", payLeg.getString("status"));
+    assertTrue(payLeg.getString("failReason").contains("GBAGDEFF"));
+
+    // Receive leg should be blocked
+    var receiveLeg = structure.getJsonObject("receiveLeg");
+    assertEquals("PENDING", receiveLeg.getString("status"));
+
+    // Hedge trades should be present
+    var hedges = structure.getJsonArray("hedgeTrades");
+    assertNotNull(hedges);
+    assertEquals(2, hedges.size());
+
+    // Exposure metrics
+    var exposure = structure.getJsonObject("totalExposure");
+    assertNotNull(exposure);
+    assertEquals(42_500, exposure.getInteger("dv01"));
+  }
+
+  // ── Counterparty credit event data tests ──────────────────────────
+
+  @Test
+  void invoke_t1000_returns_credit_event_data() {
+    var tool = new LookupTool();
+    var args = new JsonObject().put("tradeId", "T-1000");
+
+    var result = tool.invoke(args, testCtx()).result();
+    var data = result.getJsonObject("data");
+
+    // Counterparty should show credit deterioration
+    var counterparty = data.getJsonObject("counterparty");
+    assertEquals("Sterling & Hart Capital", counterparty.getString("name"));
+    assertEquals("CCC+", counterparty.getString("rating"));
+    assertEquals("BBB-", counterparty.getString("previousRating"));
+    assertEquals("S&P Global", counterparty.getString("downgradedBy"));
+
+    // Positions array should show multiple trades
+    var positions = data.getJsonArray("positions");
+    assertNotNull(positions);
+    assertEquals(4, positions.size());
+
+    // Settlement should be on credit hold
+    assertEquals("CREDIT_HOLD", data.getJsonObject("settlement").getString("status"));
+  }
+
+  @Test
+  void invoke_t1000_returns_netting_data() {
+    var tool = new LookupTool();
+    var args = new JsonObject()
+        .put("tradeId", "T-1000")
+        .put("fields", new JsonArray().add("netting"));
+
+    var result = tool.invoke(args, testCtx()).result();
+    var netting = result.getJsonObject("data").getJsonObject("netting");
+
+    assertNotNull(netting);
+    assertTrue(netting.getBoolean("isdaMasterAgreement"));
+    assertTrue(netting.getBoolean("csa"));
+    assertEquals(3_500_000, netting.getInteger("collateralPosted"));
+    assertEquals(19_800_000, netting.getInteger("grossExposure"));
+    assertEquals(8_600_000, netting.getInteger("netExposure"));
+    assertEquals(5_100_000, netting.getInteger("netAfterCollateral"));
+  }
 }

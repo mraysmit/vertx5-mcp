@@ -59,7 +59,64 @@ curl -s -X POST http://localhost:8080/trade/failures \
   -d '{"tradeId":"T-200","reason":"LEI not found in registry"}' | jq
 ```
 
-### 3) MCP — Streamable HTTP transport (2025-03-26)
+### 3) Sanctions screening — adaptive false-positive analysis (5 steps)
+```bash
+curl -s -X POST http://localhost:8080/trade/failures \
+  -H 'content-type: application/json' \
+  -d '{"tradeId":"T-800","reason":"OFAC screening flag on counterparty"}' | jq
+```
+The agent gathers screening data, performs multi-factor false-positive analysis
+(jurisdiction, sector, entity structure, client history), classifies with
+regulatory citation (31 CFR § 501.604), and **chooses email over PagerDuty**
+because the evidence suggests a probable false positive — calibrated urgency
+that only an LLM can provide.
+
+### 4) Multi-leg cascade — structural reasoning (5 steps)
+```bash
+curl -s -X POST http://localhost:8080/trade/failures \
+  -H 'content-type: application/json' \
+  -d '{"tradeId":"T-900","reason":"Linked trade cascade failure on swap leg"}' | jq
+```
+The agent discovers that a trivial SSI data error (BIC format) is blocking a
+$50M swap structure with 4 linked trades and $42,500/bp unhedged DV01 exposure.
+It classifies as **CRITICAL** (based on impact, not root cause complexity),
+publishes a cascade event to prevent duplicate downstream alerts, and sends
+**role-tailored notifications** to three different teams (Ops, Trading, Risk).
+
+### 5) Counterparty credit event — cross-domain portfolio analysis (5 steps)
+```bash
+curl -s -X POST http://localhost:8080/trade/failures \
+  -H 'content-type: application/json' \
+  -d '{"tradeId":"T-1000","reason":"Counterparty credit downgrade to CCC+"}' | jq
+```
+The agent analyses a 5-notch downgrade across 4 positions ($19.8M gross, $5.1M
+net after ISDA netting + CSA collateral). It identifies that one position (IRS,
+-$1.2M MtM) **must NOT be unwound** because it provides netting benefit — the
+kind of counter-intuitive insight that requires understanding both financial
+math and legal agreements simultaneously.
+
+### 6) Settlement amount mismatch — FX root-cause hypothesis (4 steps)
+```bash
+curl -s -X POST http://localhost:8080/trade/failures \
+  -H 'content-type: application/json' \
+  -d '{"tradeId":"T-500","reason":"Settlement amount mismatch detected"}' | jq
+```
+
+### 7) Duplicate trade detection — risk exposure analysis (4 steps)
+```bash
+curl -s -X POST http://localhost:8080/trade/failures \
+  -H 'content-type: application/json' \
+  -d '{"tradeId":"T-600","reason":"Possible duplicate trade execution"}' | jq
+```
+
+### 8) Regulatory deadline — compliance urgency (4 steps)
+```bash
+curl -s -X POST http://localhost:8080/trade/failures \
+  -H 'content-type: application/json' \
+  -d '{"tradeId":"T-700","reason":"Regulatory T+1 deadline at risk"}' | jq
+```
+
+### 9) MCP — Streamable HTTP transport (2025-03-26)
 
 ```bash
 # Initialize a session
@@ -83,7 +140,7 @@ curl -s -X POST http://localhost:3001/mcp \
   -d '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"case.raiseTicket","arguments":{"tradeId":"T-300","category":"ReferenceData","summary":"MCP test"}}}'
 ```
 
-### 4) MCP — Legacy SSE transport (2024-11-05)
+### 10) MCP — Legacy SSE transport (2024-11-05)
 ```bash
 # Open SSE connection and note the sessionId from the endpoint event
 curl -N http://localhost:3001/sse &
@@ -120,6 +177,61 @@ HTTP POST ──► HttpApiVerticle ──► DeterministicFailureProcessorVerti
 
 All wiring — addresses, handlers, tools, LLM client, MCP server — is
 externalised to `pipeline.yaml` and resolved at startup via factory classes.
+
+---
+
+## LLM Showcase Scenarios
+
+The agent includes **7 multi-step reasoning chains** (plus a fallback) that
+demonstrate capabilities requiring a real LLM — not just keyword matching.
+Each scenario is implemented as a stub rule that simulates what an LLM would
+produce; replace `StubLlmClient` with `OpenAiLlmClient` to get the same
+behaviour dynamically for **any** failure reason.
+
+### What makes these impossible without an LLM
+
+| Capability | Scenario | What the LLM does |
+|---|---|---|
+| **Multi-factor evidence weighing** | Sanctions screening (T-800) | Weighs 6 dimensions (jurisdiction, sector, entity type, ownership, history, name similarity) to assess false-positive probability at >90% confidence |
+| **Calibrated urgency** | Sanctions screening (T-800) | Chooses **email** over PagerDuty because screening hold means no settlement risk — avoids alert fatigue while ensuring regulatory review |
+| **Structural comprehension** | Multi-leg cascade (T-900) | Understands that a swap has pay/receive legs, hedges are linked, and a single SSI error cascades across 4 trades with $42,500/bp unhedged DV01 |
+| **Root-cause vs. impact distinction** | Multi-leg cascade (T-900) | Classifies as **CRITICAL** despite trivial root cause (BIC format) because the financial impact ($2.75M MtM) is massive — "5 minutes to fix, $850K at risk" |
+| **Role-tailored communication** | Multi-leg cascade (T-900) | One notification with different actionable content for 3 teams: fix instructions for Ops, hedge degradation warning for Trading, VaR metrics for Risk |
+| **Cross-domain reasoning** | Credit event (T-1000) | Simultaneously applies financial math (netting), ISDA legal analysis (Section 5(b)(v)), and portfolio risk assessment to produce a single coherent analysis |
+| **Counter-intuitive recommendations** | Credit event (T-1000) | Identifies that the IRS position (we **owe** $1.2M) must **NOT** be unwound because it provides netting benefit — the opposite of the naive instinct |
+| **Exposure waterfall calculation** | Credit event (T-1000) | Calculates Gross $19.8M → Net $8.6M (ISDA netting) → Net after collateral $5.1M (CSA), then prioritises actions by risk, not position size |
+| **Regulatory knowledge** | Sanctions (T-800), Regulatory (T-700) | Cites specific regulations (31 CFR § 501.604, SEC Rule 15c6-1) and understands their operational implications |
+| **FX root-cause hypothesis** | Settlement mismatch (T-500) | Correlates the $250K discrepancy (20%) with a EUR/USD rate movement (+0.30%) to hypothesise a T+1 FX rate timing issue |
+| **Pattern recognition** | Duplicate trade (T-600) | Recognises 3-second time delta + identical parameters as "retry-after-timeout" pattern and quantifies $1.25M unintended exposure |
+
+### Scenario summary
+
+| Scenario | Trade IDs | Steps | Key LLM capability |
+|---|---|---|---|
+| LEI missing | T-200 | 3 | Basic multi-step: lookup → classify → raise ticket |
+| Settlement mismatch | T-500 | 4 | FX correlation + root-cause hypothesis |
+| Duplicate trade | T-600 | 4 | Pattern recognition + risk quantification |
+| Regulatory deadline | T-700 | 4 | Time-critical compliance with SEC rule awareness |
+| **Sanctions screening** | **T-800** | **5** | **Adaptive false-positive analysis + calibrated urgency** |
+| **Multi-leg cascade** | **T-900** | **5** | **Structural reasoning + cross-domain impact analysis** |
+| **Credit event** | **T-1000** | **5** | **Portfolio netting + counter-intuitive recommendation** |
+| Fallback (any reason) | any | 3 | Graceful handling of unknown patterns |
+
+### The `reasoning` field
+
+Every step includes a `reasoning` field that explains the LLM's thought
+process. When using a real LLM, this becomes the model's actual chain-of-thought.
+The stub version demonstrates the **quality and depth** of reasoning expected:
+
+```json
+{
+  "intent": "CALL_TOOL",
+  "tool": "comms.notify",
+  "args": { "channel": "email", "team": "Compliance + Legal", ... },
+  "reasoning": "I'm choosing EMAIL over PagerDuty because this is assessed as a probable false positive with the trade already safely on hold. PagerDuty would be appropriate for a high-confidence true positive where immediate blocking action is needed...",
+  "stop": true
+}
+```
 
 ---
 
@@ -318,7 +430,7 @@ factories resolve YAML aliases to concrete classes.
 
 ## Test Coverage
 
-24 test classes across all three modules covering:
+24 test classes / 100 test cases across all three modules covering:
 
 **mcp-server**
 - `ToolRegistry` immutability, lookup, and registration
@@ -339,7 +451,8 @@ factories resolve YAML aliases to concrete classes.
 - YAML config parsing and missing-resource handling
 - Handler behaviour (`LookupEnrichHandler`, `EscalateHandler`)
 - Tool invocation and schema metadata (`RaiseTicketTool`, `PublishEventTool`)
-- `TradeFailureRuleLoader` rule loading
+- `TradeFailureRuleLoader` — all 7 multi-step rules + fallback, including sanctions (5-step), cascade (5-step), and credit event (5-step) chains
+- `LookupTool` — scenario-specific data for all trade ID ranges (sanctions screening, multi-leg structures, credit/netting data)
 - End-to-end smoke tests (deterministic + agent paths)
 
 ## Logging

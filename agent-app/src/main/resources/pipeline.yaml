@@ -34,7 +34,7 @@ schema:
 
 # ── Agent settings ───────────────────────────────────────────────────────────
 agent:
-  maxSteps: 5
+  maxSteps: 8
   timeoutMs: 10000
 
 # ── Deterministic handlers (reason → handler type + params) ──────────────────
